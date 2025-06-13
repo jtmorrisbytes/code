@@ -1,0 +1,29 @@
+[package]
+name="libapp"
+version="0.1.0"
+edition="2021"
+
+[build-dependencies]
+cc="1.0"
+
+# make sure you enable features for your target platform
+
+[features]
+target_os_linux=["x11","libc","winit/x11","winit/wayland"]
+target_os_windows=["windows",]
+target_os_android=["winit/android-native-activity"]
+target_os_ios=[]
+target_os_macos=[]
+default=["target_os_linux"]
+
+[dependencies]
+#linux specific dependencies
+x11={version="2.21.0",optional=true}
+libc = {version="0.2.172",optional=true}
+
+#windows specific dependencies
+windows = {version="0.61.1",optional=true}
+
+thiserror = "2.0.12"
+winit = "0.30.11"
+cfg-if = "1.0.1"

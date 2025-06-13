@@ -1,0 +1,18 @@
+[package]
+name="app"
+version="0.1.0"
+edition="2021"
+
+[build-dependencies]
+cc="1.0"
+
+[dependencies]
+libapp={path="../libapp"}
+
+
+[target.'cfg(target_os="linux")'.dependencies]
+xcb = "1.5.0"
+libc = "0.2.172"
+
+[target.'cfg(windows)'.dependencies]
+windows = "0.61.1"
