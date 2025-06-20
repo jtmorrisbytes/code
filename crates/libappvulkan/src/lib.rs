@@ -311,7 +311,7 @@ impl Loader {
     }
     pub fn vk_destroy_instance(
         &self,
-        mut vk_instance: bindings::VkInstance,
+        vk_instance: bindings::VkInstance,
         allocation_callbacks: *const crate::bindings::VkAllocationCallbacks,
     ) -> Result<(), String> {
         let ptr = unsafe { _dlsym(self.shared_object, "vkDestroyInstance")? };
@@ -342,11 +342,11 @@ impl Loader {
             .map(|pfn| unsafe {
                 std::mem::transmute::<
                     _,
-                    (unsafe extern "C" fn(
+                    unsafe extern "C" fn(
                         *const ::std::os::raw::c_char,
                         *mut u32,
                         *mut bindings::VkExtensionProperties,
-                    ) -> bindings::VkResult),
+                    ) -> bindings::VkResult,
                 >(pfn as *const ())
             })
             .unwrap();

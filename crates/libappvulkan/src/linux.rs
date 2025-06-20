@@ -1,4 +1,4 @@
-#![allow(non_camel_case_types, non_upper_case_globals, unused)]
+#![allow(non_upper_case_globals, unused)]
 #[cfg(any(target_os = "linux"))]
 use crate::bindings::VkPhysicalDevice;
 use crate::bindings::{
