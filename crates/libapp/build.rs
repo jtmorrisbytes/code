@@ -11,11 +11,8 @@ fn main() {
 
     //     }
     // }
-    if &target_os == "linux" {   
+    if &target_os == "linux" {
         println!("cargo:rustc-link-lib=GL");
         println!("cargo:rustc-link-lib=X11");
-
     }
-
-
 }

@@ -1,0 +1,49 @@
+[package]
+name="libappvulkan"
+version="0.1.0"
+edition="2021"
+
+[features]
+
+default=["VK_USE_PLATFORM_XLIB_KHR"]
+
+
+VK_USE_PLATFORM_ANDROID_KHR=[]
+VK_USE_PLATFORM_FUCHSIA=[]
+VK_USE_PLATFORM_IOS_MVK=[]
+VK_USE_PLATFORM_MACOS_MVK=[]
+VK_USE_PLATFORM_METAL_EXT=[]
+VK_USE_PLATFORM_VI_NN=[]
+VK_USE_PLATFORM_WAYLAND_KHR=[]
+
+#also inlcudes win32 deps
+VK_USE_PLATFORM_WIN32_KHR=[]
+
+#also includes XCB deps
+VK_USE_PLATFORM_XCB_KHR=[]
+
+VK_USE_PLATFORM_XLIB_KHR=[]
+
+VK_USE_PLATFORM_DIRECTFB_EXT=[]
+
+VK_USE_PLATFORM_XLIB_XRANDR_EXT=[]
+
+VK_USE_PLATFORM_GGP=[]
+
+VK_USE_PLATFORM_SCI=[]
+
+VK_ENABLE_BETA_EXTENSIONS=[]
+
+
+
+
+
+[target.'cfg(target_os="windows")'.dependencies]
+windows={version = "0.61.3",features=["Win32_Foundation","Win32_Security","Win32_System_LibraryLoader","Win32_Graphics_Gdi"]}
+
+[target.'cfg(target_os="linux")'.dependencies]
+x11 = {version="2.21.0"}
+
+
+[dependencies]
+cfg-if = "1.0.1"
