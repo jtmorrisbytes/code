@@ -23,7 +23,7 @@ pub struct VkInstance {
 }
 impl VkInstance {
     pub fn as_ptr(&self) -> bindings::VkInstance {
-        self.ptr.clone()
+        self.ptr
     }
     pub fn destroy(self) -> Result<(), String> {
         self.loader
@@ -32,7 +32,7 @@ impl VkInstance {
     }
     pub fn create_instance(create_info: &bindings::VkInstanceCreateInfo) -> Result<Self, String> {
         let loader = Loader::try_new()?;
-        let ptr = loader.vk_create_instance(&create_info, None)?;
+        let ptr = loader.vk_create_instance(create_info, None)?;
 
         Ok(Self { ptr, loader })
     }
@@ -186,14 +186,14 @@ pub struct Loader {
 //         unsafe { dlclose(self.shared_object) };
 //     }
 // }
-macro_rules! transmute {
-    ($ptr:ident,$t:ty) => {
-        unsafe {
-            let __ptr = $ptr as *const ();
-            std::mem::transmute::<_, $t>(__ptr)
-        }
-    };
-}
+// macro_rules! transmute {
+//     ($ptr:ident,$t:ty) => {
+//         unsafe {
+//             let __ptr = $ptr as *const ();
+//             std::mem::transmute::<_, $t>(__ptr)
+//         }
+//     };
+// }
 unsafe fn _transmute<T>(ptr: *mut std::ffi::c_void) -> T {
     let _ptr = ptr as *const ();
     unsafe { std::mem::transmute_copy::<_, T>(&*_ptr) }
@@ -239,7 +239,7 @@ impl Loader {
             pfn_vk_createinstance,
             crate::bindings::PFN_vkGetInstanceProcAddr
         )
-        .ok_or(format!("Failed to get pointer to vkCreateInstance"))?;
+        .ok_or("Failed to get pointer to vkCreateInstance".to_string())?;
         Ok(Self {
             shared_object,
             pfn_vk_get_instance_proc_address: Some(pfn_vk_get_instance_proc_addr),
@@ -251,9 +251,9 @@ impl Loader {
         name: &str,
     ) -> Result<Option<unsafe extern "C" fn()>, String> {
         if self.pfn_vk_get_instance_proc_address.is_none() {
-            return Err(format!("function vkGetInstanceProcedureAddr is not available, cannot call vkGetInstanceProcedureAddr from this interface!"));
+            return Err("function vkGetInstanceProcedureAddr is not available, cannot call vkGetInstanceProcedureAddr from this interface!".to_string());
         }
-        let p_fn = self.pfn_vk_get_instance_proc_address.clone().unwrap();
+        let p_fn = self.pfn_vk_get_instance_proc_address.unwrap();
         let cstr = std::ffi::CString::new(name).expect("Non null terminated rust strings!");
         let procaddr = unsafe { p_fn(instance, cstr.as_ptr()) };
         Ok(procaddr)
@@ -272,12 +272,12 @@ impl Loader {
             )
         };
         if function.is_none() {
-            return Err(format!("vkCreateInstance was null"));
+            return Err("vkCreateInstance was null".to_string());
         }
         let function = unsafe { function.unwrap_unchecked() };
         let allocation_callbacks = allocation_callbacks
             .as_ref()
-            .map(|v| std::ptr::from_ref(v))
+            .map(std::ptr::from_ref)
             .unwrap_or(std::ptr::null());
         let mut instance: crate::bindings::VkInstance = std::ptr::null_mut();
         let vk_result: crate::bindings::VkResult =
@@ -293,17 +293,17 @@ impl Loader {
                     }
                 }
                 crate::bindings::VkResult_VK_ERROR_OUT_OF_DEVICE_MEMORY => {
-                    Err(format!("vkCreateInstance: Out of DEVICE memory"))
+                    Err("vkCreateInstance: Out of DEVICE memory".to_string())
                 }
                 crate::bindings::VkResult_VK_ERROR_OUT_OF_HOST_MEMORY => {
-                    Err(format!("vkCreateInstance: Out of HOST memory"))
+                    Err("vkCreateInstance: Out of HOST memory".to_string())
                 }
                 crate::bindings::VkResult_VK_ERROR_INITIALIZATION_FAILED => {
-                    Err(format!("vkCreateInstance: Initialization failed"))
+                    Err("vkCreateInstance: Initialization failed".to_string())
                 }
-                crate::bindings::VkResult_VK_ERROR_LAYER_NOT_PRESENT => Err(format!("vkCreateInstance: A requested validation layer was not loaded or is not available")),
-                crate::bindings::VkResult_VK_ERROR_EXTENSION_NOT_PRESENT => Err(format!("vkCreateInstance: A requested extension is not present or is not available")),
-                crate::bindings::VkResult_VK_ERROR_INCOMPATIBLE_DRIVER => Err(format!("vkCreateInstance: The driver that vulkan tried is not compatible")),
+                crate::bindings::VkResult_VK_ERROR_LAYER_NOT_PRESENT => Err("vkCreateInstance: A requested validation layer was not loaded or is not available".to_string()),
+                crate::bindings::VkResult_VK_ERROR_EXTENSION_NOT_PRESENT => Err("vkCreateInstance: A requested extension is not present or is not available".to_string()),
+                crate::bindings::VkResult_VK_ERROR_INCOMPATIBLE_DRIVER => Err("vkCreateInstance: The driver that vulkan tried is not compatible".to_string()),
                 _=> {
                     Err(format!("The function vkCreateInstance returned a VkResult value which is not understood by this application: {vk_result}"))
                 }
@@ -323,7 +323,7 @@ impl Loader {
 
         // let pfn = self.vk_get_instance_proc_addr(vk_instance,"vkDestroyInstance")?;
         // let pfn: bindings::PFN_vkDestroyInstance = unsafe {std::mem::transmute(pfn)};
-        let pfn = pfn.ok_or_else(|| format!("vkDestroyInstance is not available"))?;
+        let pfn = pfn.ok_or_else(|| "vkDestroyInstance is not available".to_string())?;
         assert!(!vk_instance.is_null());
         dbg!(vk_instance);
         unsafe { pfn(vk_instance, allocation_callbacks) };
