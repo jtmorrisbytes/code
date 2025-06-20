@@ -1,3 +1,19 @@
 [workspace]
 members=["rust_libraries/*","rust_binaries/*"]
 resolver="2"
+
+[workspace.dependencies]
+uuid={version = "1.10.0"}
+dotenvy = "0.15.7"
+serde ="1.0.203"
+thiserror = "1.0.61"
+tracing = "0.1.40"
+anyhow = "1.0.86"
+url="2.5"
+base64 = "0.22.1"
+reqwest = {version="0.12.7"}
+# browser only dependencies!
+wasm-bindgen= {version="0.2.93"}
+web-sys={version="0.3.70"}
+js-sys={version="0.3.70"}
+figment={version = "0.10.19"}
