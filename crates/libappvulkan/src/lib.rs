@@ -194,20 +194,20 @@ pub struct Loader {
 //         }
 //     };
 // }
-unsafe fn _transmute<T>(ptr: *mut std::ffi::c_void) -> T {
+unsafe fn transmute<T>(ptr: *mut std::ffi::c_void) -> T {
     let _ptr = ptr as *const ();
     unsafe { std::mem::transmute_copy::<_, T>(&*_ptr) }
 }
 unsafe fn load_symbol<T>(handle: *mut std::ffi::c_void, symbol_name: &str) -> Result<T, String> {
     let ptr = unsafe { _dlsym(handle, symbol_name) }?;
-    let t = unsafe { _transmute::<T>(ptr) };
+    let t = unsafe { transmute::<T>(ptr) };
     Ok(t)
 }
 
 impl Loader {
     pub unsafe fn load_symbol<T>(&self, symbol_name: &str) -> Result<T, String> {
         let ptr = unsafe { _dlsym(self.shared_object, symbol_name) }?;
-        let t = unsafe { _transmute::<T>(ptr) };
+        let t = unsafe { transmute::<T>(ptr) };
         Ok(t)
     }
     pub fn try_new() -> Result<Self, String> {
@@ -235,10 +235,9 @@ impl Loader {
         }
         // load all essential functions
         let pfn_vk_createinstance = unsafe { _dlsym(shared_object, "vkGetInstanceProcAddr")? };
-        let pfn_vk_get_instance_proc_addr = transmute!(
+        let pfn_vk_get_instance_proc_addr = unsafe {transmute::<crate::bindings::PFN_vkGetInstanceProcAddr>(
             pfn_vk_createinstance,
-            crate::bindings::PFN_vkGetInstanceProcAddr
-        )
+        )}
         .ok_or("Failed to get pointer to vkCreateInstance".to_string())?;
         Ok(Self {
             shared_object,
