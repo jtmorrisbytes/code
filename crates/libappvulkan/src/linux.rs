@@ -3307,18 +3307,18 @@ pub struct _XIMPreeditCaretCallbackStruct {
     pub style: XIMCaretStyle,
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
-const _: () = {
-    ["Size of _XIMPreeditCaretCallbackStruct"]
-        [::std::mem::size_of::<_XIMPreeditCaretCallbackStruct>() - 12usize];
-    ["Alignment of _XIMPreeditCaretCallbackStruct"]
-        [::std::mem::align_of::<_XIMPreeditCaretCallbackStruct>() - 4usize];
-    ["Offset of field: _XIMPreeditCaretCallbackStruct::position"]
-        [::std::mem::offset_of!(_XIMPreeditCaretCallbackStruct, position) - 0usize];
-    ["Offset of field: _XIMPreeditCaretCallbackStruct::direction"]
-        [::std::mem::offset_of!(_XIMPreeditCaretCallbackStruct, direction) - 4usize];
-    ["Offset of field: _XIMPreeditCaretCallbackStruct::style"]
-        [::std::mem::offset_of!(_XIMPreeditCaretCallbackStruct, style) - 8usize];
-};
+// const _: () = {
+//     ["Size of _XIMPreeditCaretCallbackStruct"]
+//         [::std::mem::size_of::<_XIMPreeditCaretCallbackStruct>() - 12usize];
+//     ["Alignment of _XIMPreeditCaretCallbackStruct"]
+//         [::std::mem::align_of::<_XIMPreeditCaretCallbackStruct>() - 4usize];
+//     ["Offset of field: _XIMPreeditCaretCallbackStruct::position"]
+//         [::std::mem::offset_of!(_XIMPreeditCaretCallbackStruct, position) - 0usize];
+//     ["Offset of field: _XIMPreeditCaretCallbackStruct::direction"]
+//         [::std::mem::offset_of!(_XIMPreeditCaretCallbackStruct, direction) - 4usize];
+//     ["Offset of field: _XIMPreeditCaretCallbackStruct::style"]
+//         [::std::mem::offset_of!(_XIMPreeditCaretCallbackStruct, style) - 8usize];
+// };
 pub type XIMPreeditCaretCallbackStruct = _XIMPreeditCaretCallbackStruct;
 pub const XIMStatusDataType_XIMTextType: XIMStatusDataType = 0;
 pub const XIMStatusDataType_XIMBitmapType: XIMStatusDataType = 1;
@@ -3335,28 +3335,28 @@ pub union _XIMStatusDrawCallbackStruct__bindgen_ty_1 {
     pub text: *mut XIMText,
     pub bitmap: Pixmap,
 }
-#[allow(clippy::unnecessary_operation, clippy::identity_op)]
-const _: () = {
-    ["Size of _XIMStatusDrawCallbackStruct__bindgen_ty_1"]
-        [::std::mem::size_of::<_XIMStatusDrawCallbackStruct__bindgen_ty_1>() - 8usize];
-    ["Alignment of _XIMStatusDrawCallbackStruct__bindgen_ty_1"]
-        [::std::mem::align_of::<_XIMStatusDrawCallbackStruct__bindgen_ty_1>() - 8usize];
-    ["Offset of field: _XIMStatusDrawCallbackStruct__bindgen_ty_1::text"]
-        [::std::mem::offset_of!(_XIMStatusDrawCallbackStruct__bindgen_ty_1, text) - 0usize];
-    ["Offset of field: _XIMStatusDrawCallbackStruct__bindgen_ty_1::bitmap"]
-        [::std::mem::offset_of!(_XIMStatusDrawCallbackStruct__bindgen_ty_1, bitmap) - 0usize];
-};
-#[allow(clippy::unnecessary_operation, clippy::identity_op)]
-const _: () = {
-    ["Size of _XIMStatusDrawCallbackStruct"]
-        [::std::mem::size_of::<_XIMStatusDrawCallbackStruct>() - 16usize];
-    ["Alignment of _XIMStatusDrawCallbackStruct"]
-        [::std::mem::align_of::<_XIMStatusDrawCallbackStruct>() - 8usize];
-    ["Offset of field: _XIMStatusDrawCallbackStruct::type_"]
-        [::std::mem::offset_of!(_XIMStatusDrawCallbackStruct, type_) - 0usize];
-    ["Offset of field: _XIMStatusDrawCallbackStruct::data"]
-        [::std::mem::offset_of!(_XIMStatusDrawCallbackStruct, data) - 8usize];
-};
+// #[allow(clippy::unnecessary_operation, clippy::identity_op)]
+// const _: () = {
+//     ["Size of _XIMStatusDrawCallbackStruct__bindgen_ty_1"]
+//         [::std::mem::size_of::<_XIMStatusDrawCallbackStruct__bindgen_ty_1>() - 8usize];
+//     ["Alignment of _XIMStatusDrawCallbackStruct__bindgen_ty_1"]
+//         [::std::mem::align_of::<_XIMStatusDrawCallbackStruct__bindgen_ty_1>() - 8usize];
+//     ["Offset of field: _XIMStatusDrawCallbackStruct__bindgen_ty_1::text"]
+//         [::std::mem::offset_of!(_XIMStatusDrawCallbackStruct__bindgen_ty_1, text) - 0usize];
+//     ["Offset of field: _XIMStatusDrawCallbackStruct__bindgen_ty_1::bitmap"]
+//         [::std::mem::offset_of!(_XIMStatusDrawCallbackStruct__bindgen_ty_1, bitmap) - 0usize];
+// };
+// #[allow(clippy::unnecessary_operation, clippy::identity_op)]
+// const _: () = {
+//     ["Size of _XIMStatusDrawCallbackStruct"]
+//         [::std::mem::size_of::<_XIMStatusDrawCallbackStruct>() - 16usize];
+//     ["Alignment of _XIMStatusDrawCallbackStruct"]
+//         [::std::mem::align_of::<_XIMStatusDrawCallbackStruct>() - 8usize];
+//     ["Offset of field: _XIMStatusDrawCallbackStruct::type_"]
+//         [::std::mem::offset_of!(_XIMStatusDrawCallbackStruct, type_) - 0usize];
+//     ["Offset of field: _XIMStatusDrawCallbackStruct::data"]
+//         [::std::mem::offset_of!(_XIMStatusDrawCallbackStruct, data) - 8usize];
+// };
 #[cfg(target_os = "linux")]
 pub type XIMStatusDrawCallbackStruct = _XIMStatusDrawCallbackStruct;
 #[repr(C)]
@@ -3367,37 +3367,37 @@ pub struct _XIMHotKeyTrigger {
     pub modifier: ::std::os::raw::c_int,
     pub modifier_mask: ::std::os::raw::c_int,
 }
-#[cfg(target_os = "linux")]
-#[allow(clippy::unnecessary_operation, clippy::identity_op)]
-const _: () = {
-    ["Size of _XIMHotKeyTrigger"][::std::mem::size_of::<_XIMHotKeyTrigger>() - 16usize];
-    ["Alignment of _XIMHotKeyTrigger"][::std::mem::align_of::<_XIMHotKeyTrigger>() - 8usize];
-    ["Offset of field: _XIMHotKeyTrigger::keysym"]
-        [::std::mem::offset_of!(_XIMHotKeyTrigger, keysym) - 0usize];
-    ["Offset of field: _XIMHotKeyTrigger::modifier"]
-        [::std::mem::offset_of!(_XIMHotKeyTrigger, modifier) - 8usize];
-    ["Offset of field: _XIMHotKeyTrigger::modifier_mask"]
-        [::std::mem::offset_of!(_XIMHotKeyTrigger, modifier_mask) - 12usize];
-};
-#[cfg(target_os = "linux")]
+// #[cfg(target_os = "linux")]
+// #[allow(clippy::unnecessary_operation, clippy::identity_op)]
+// const _: () = {
+//     ["Size of _XIMHotKeyTrigger"][::std::mem::size_of::<_XIMHotKeyTrigger>() - 16usize];
+//     ["Alignment of _XIMHotKeyTrigger"][::std::mem::align_of::<_XIMHotKeyTrigger>() - 8usize];
+//     ["Offset of field: _XIMHotKeyTrigger::keysym"]
+//         [::std::mem::offset_of!(_XIMHotKeyTrigger, keysym) - 0usize];
+//     ["Offset of field: _XIMHotKeyTrigger::modifier"]
+//         [::std::mem::offset_of!(_XIMHotKeyTrigger, modifier) - 8usize];
+//     ["Offset of field: _XIMHotKeyTrigger::modifier_mask"]
+//         [::std::mem::offset_of!(_XIMHotKeyTrigger, modifier_mask) - 12usize];
+// };
+
 pub type XIMHotKeyTrigger = _XIMHotKeyTrigger;
-#[cfg(target_os = "linux")]
+
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct _XIMHotKeyTriggers {
     pub num_hot_key: ::std::os::raw::c_int,
     pub key: *mut XIMHotKeyTrigger,
 }
-#[allow(clippy::unnecessary_operation, clippy::identity_op)]
-const _: () = {
-    ["Size of _XIMHotKeyTriggers"][::std::mem::size_of::<_XIMHotKeyTriggers>() - 16usize];
-    ["Alignment of _XIMHotKeyTriggers"][::std::mem::align_of::<_XIMHotKeyTriggers>() - 8usize];
-    ["Offset of field: _XIMHotKeyTriggers::num_hot_key"]
-        [::std::mem::offset_of!(_XIMHotKeyTriggers, num_hot_key) - 0usize];
-    ["Offset of field: _XIMHotKeyTriggers::key"]
-        [::std::mem::offset_of!(_XIMHotKeyTriggers, key) - 8usize];
-};
-#[cfg(target_os = "linux")]
+// #[allow(clippy::unnecessary_operation, clippy::identity_op)]
+// const _: () = {
+//     ["Size of _XIMHotKeyTriggers"][::std::mem::size_of::<_XIMHotKeyTriggers>() - 16usize];
+//     ["Alignment of _XIMHotKeyTriggers"][::std::mem::align_of::<_XIMHotKeyTriggers>() - 8usize];
+//     ["Offset of field: _XIMHotKeyTriggers::num_hot_key"]
+//         [::std::mem::offset_of!(_XIMHotKeyTriggers, num_hot_key) - 0usize];
+//     ["Offset of field: _XIMHotKeyTriggers::key"]
+//         [::std::mem::offset_of!(_XIMHotKeyTriggers, key) - 8usize];
+// };
+
 pub type XIMHotKeyTriggers = _XIMHotKeyTriggers;
 pub type XIMHotKeyState = ::std::os::raw::c_ulong;
 #[repr(C)]
@@ -3406,15 +3406,15 @@ pub struct XIMValuesList {
     pub count_values: ::std::os::raw::c_ushort,
     pub supported_values: *mut *mut ::std::os::raw::c_char,
 }
-#[allow(clippy::unnecessary_operation, clippy::identity_op)]
-const _: () = {
-    ["Size of XIMValuesList"][::std::mem::size_of::<XIMValuesList>() - 16usize];
-    ["Alignment of XIMValuesList"][::std::mem::align_of::<XIMValuesList>() - 8usize];
-    ["Offset of field: XIMValuesList::count_values"]
-        [::std::mem::offset_of!(XIMValuesList, count_values) - 0usize];
-    ["Offset of field: XIMValuesList::supported_values"]
-        [::std::mem::offset_of!(XIMValuesList, supported_values) - 8usize];
-};
+// #[allow(clippy::unnecessary_operation, clippy::identity_op)]
+// const _: () = {
+//     ["Size of XIMValuesList"][::std::mem::size_of::<XIMValuesList>() - 16usize];
+//     ["Alignment of XIMValuesList"][::std::mem::align_of::<XIMValuesList>() - 8usize];
+//     ["Offset of field: XIMValuesList::count_values"]
+//         [::std::mem::offset_of!(XIMValuesList, count_values) - 0usize];
+//     ["Offset of field: XIMValuesList::supported_values"]
+//         [::std::mem::offset_of!(XIMValuesList, supported_values) - 8usize];
+// };
 pub type XErrorHandler = ::std::option::Option<
     unsafe extern "C" fn(arg1: *mut Display, arg2: *mut XErrorEvent) -> ::std::os::raw::c_int,
 >;
@@ -3436,29 +3436,30 @@ pub type VkXlibSurfaceCreateFlagsKHR = VkFlags;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct VkXlibSurfaceCreateInfoKHR {
-    pub sType: VkStructureType,
-    pub pNext: *const ::std::os::raw::c_void,
+    pub s_type: VkStructureType,
+    pub p_next: *const ::std::os::raw::c_void,
     pub flags: VkXlibSurfaceCreateFlagsKHR,
     pub dpy: *mut Display,
     pub window: Window,
 }
-#[allow(clippy::unnecessary_operation, clippy::identity_op)]
-const _: () = {
-    ["Size of VkXlibSurfaceCreateInfoKHR"]
-        [::std::mem::size_of::<VkXlibSurfaceCreateInfoKHR>() - 40usize];
-    ["Alignment of VkXlibSurfaceCreateInfoKHR"]
-        [::std::mem::align_of::<VkXlibSurfaceCreateInfoKHR>() - 8usize];
-    ["Offset of field: VkXlibSurfaceCreateInfoKHR::sType"]
-        [::std::mem::offset_of!(VkXlibSurfaceCreateInfoKHR, sType) - 0usize];
-    ["Offset of field: VkXlibSurfaceCreateInfoKHR::pNext"]
-        [::std::mem::offset_of!(VkXlibSurfaceCreateInfoKHR, pNext) - 8usize];
-    ["Offset of field: VkXlibSurfaceCreateInfoKHR::flags"]
-        [::std::mem::offset_of!(VkXlibSurfaceCreateInfoKHR, flags) - 16usize];
-    ["Offset of field: VkXlibSurfaceCreateInfoKHR::dpy"]
-        [::std::mem::offset_of!(VkXlibSurfaceCreateInfoKHR, dpy) - 24usize];
-    ["Offset of field: VkXlibSurfaceCreateInfoKHR::window"]
-        [::std::mem::offset_of!(VkXlibSurfaceCreateInfoKHR, window) - 32usize];
-};
+// #[allow(clippy::unnecessary_operation, clippy::identity_op)]
+// const _: () = {
+//     ["Size of VkXlibSurfaceCreateInfoKHR"]
+//         [::std::mem::size_of::<VkXlibSurfaceCreateInfoKHR>() - 40usize];
+//     ["Alignment of VkXlibSurfaceCreateInfoKHR"]
+//         [::std::mem::align_of::<VkXlibSurfaceCreateInfoKHR>() - 8usize];
+//     ["Offset of field: VkXlibSurfaceCreateInfoKHR::s_type"]
+//         [::std::mem::offset_of!(VkXlibSurfaceCreateInfoKHR, s_type) - 0usize];
+//     ["Offset of field: VkXlibSurfaceCreateInfoKHR::p_next"]
+//         [::std::mem::offset_of!(VkXlibSurfaceCreateInfoKHR, p_next) - 8usize];
+//     ["Offset of field: VkXlibSurfaceCreateInfoKHR::flags"]
+//         [::std::mem::offset_of!(VkXlibSurfaceCreateInfoKHR, flags) - 16usize];
+//     ["Offset of field: VkXlibSurfaceCreateInfoKHR::dpy"]
+//         [::std::mem::offset_of!(VkXlibSurfaceCreateInfoKHR, dpy) - 24usize];
+//     ["Offset of field: VkXlibSurfaceCreateInfoKHR::window"]
+//         [::std::mem::offset_of!(VkXlibSurfaceCreateInfoKHR, window) - 32usize];
+// };
+#[allow(non_camel_case_types)]
 pub type PFN_vkCreateXlibSurfaceKHR = ::std::option::Option<
     unsafe extern "C" fn(
         instance: VkInstance,
@@ -3467,6 +3468,7 @@ pub type PFN_vkCreateXlibSurfaceKHR = ::std::option::Option<
         pSurface: *mut VkSurfaceKHR,
     ) -> VkResult,
 >;
+#[allow(non_camel_case_types)]
 pub type PFN_vkGetPhysicalDeviceXlibPresentationSupportKHR = ::std::option::Option<
     unsafe extern "C" fn(
         physicalDevice: VkPhysicalDevice,
@@ -3477,12 +3479,12 @@ pub type PFN_vkGetPhysicalDeviceXlibPresentationSupportKHR = ::std::option::Opti
 >;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
-pub struct wl_display {
+pub struct WlDisplay {
     pub _address: u8,
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
-pub struct wl_surface {
+pub struct WlSurface {
     pub _address: u8,
 }
 
@@ -5339,7 +5341,7 @@ extern "C" {
     pub fn vkGetPhysicalDeviceWaylandPresentationSupportKHR(
         physicalDevice: VkPhysicalDevice,
         queueFamilyIndex: u32,
-        display: *mut wl_display,
+        display: *mut WlDisplay,
     ) -> VkBool32;
 }
 
@@ -5347,11 +5349,11 @@ pub type VkWaylandSurfaceCreateFlagsKHR = VkFlags;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct VkWaylandSurfaceCreateInfoKHR {
-    pub sType: VkStructureType,
-    pub pNext: *const ::std::os::raw::c_void,
+    pub s_type: VkStructureType,
+    pub p_next: *const ::std::os::raw::c_void,
     pub flags: VkWaylandSurfaceCreateFlagsKHR,
-    pub display: *mut wl_display,
-    pub surface: *mut wl_surface,
+    pub display: *mut WlDisplay,
+    pub surface: *mut WlSurface,
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
@@ -5359,10 +5361,10 @@ const _: () = {
         [::std::mem::size_of::<VkWaylandSurfaceCreateInfoKHR>() - 40usize];
     ["Alignment of VkWaylandSurfaceCreateInfoKHR"]
         [::std::mem::align_of::<VkWaylandSurfaceCreateInfoKHR>() - 8usize];
-    ["Offset of field: VkWaylandSurfaceCreateInfoKHR::sType"]
-        [::std::mem::offset_of!(VkWaylandSurfaceCreateInfoKHR, sType) - 0usize];
-    ["Offset of field: VkWaylandSurfaceCreateInfoKHR::pNext"]
-        [::std::mem::offset_of!(VkWaylandSurfaceCreateInfoKHR, pNext) - 8usize];
+    ["Offset of field: VkWaylandSurfaceCreateInfoKHR::s_type"]
+        [::std::mem::offset_of!(VkWaylandSurfaceCreateInfoKHR, s_type) - 0usize];
+    ["Offset of field: VkWaylandSurfaceCreateInfoKHR::p_next"]
+        [::std::mem::offset_of!(VkWaylandSurfaceCreateInfoKHR, p_next) - 8usize];
     ["Offset of field: VkWaylandSurfaceCreateInfoKHR::flags"]
         [::std::mem::offset_of!(VkWaylandSurfaceCreateInfoKHR, flags) - 16usize];
     ["Offset of field: VkWaylandSurfaceCreateInfoKHR::display"]
@@ -5382,7 +5384,7 @@ pub type PFN_vkGetPhysicalDeviceWaylandPresentationSupportKHR = ::std::option::O
     unsafe extern "C" fn(
         physicalDevice: VkPhysicalDevice,
         queueFamilyIndex: u32,
-        display: *mut wl_display,
+        display: *mut WlDisplay,
     ) -> VkBool32,
 >;
 
