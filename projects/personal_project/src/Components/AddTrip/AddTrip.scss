@@ -1,0 +1,73 @@
+$button-primary: rgb(247, 220, 111);
+
+#addTrip-root {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  .trip-info {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background-color: white;
+    width: 15rem;
+
+    .total-box {
+      display: flex;
+      align-items: center;
+      width: 52%;
+
+      h5 {
+        margin-left: 25%;
+      }
+
+      i {
+        margin-left: 18%;
+        cursor: pointer;
+        user-select: none;
+      }
+    }
+
+    .total-box2 {
+      display: flex;
+      align-items: center;
+      width: 52%;
+
+      h5 {
+        margin-left: 20%;
+      }
+
+      i {
+        margin-left: 18%;
+        cursor: pointer;
+        user-select: none;
+      }
+    }
+
+    input {
+      width: 10rem;
+      height: 25px;
+      text-align: center;
+    }
+
+    .upload-btn {
+      background-color: #000000;
+      color: white;
+      height: 18px;
+    }
+
+    .save-btn {
+      margin: 10px 0px 10px 0px;
+      background-color: $button-primary;
+      height: 30px;
+      width: 6rem;
+      border-radius: 3px;
+    }
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background-color: white;
+    width: 20rem;
+    margin: 4rem 0rem 2rem 0rem;
+    box-shadow: 0 3px 7px #333;
+  }
+}

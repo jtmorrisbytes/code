@@ -1,0 +1,94 @@
+#register-root {
+  background-color: #bdc3c7;
+  padding: 0rem 0rem 11rem 0rem;
+}
+
+#register-root .title-rya {
+  display: -webkit-box;
+  display: -ms-flexbox;
+  display: flex;
+  -webkit-box-orient: vertical;
+  -webkit-box-direction: normal;
+      -ms-flex-direction: column;
+          flex-direction: column;
+  -webkit-box-align: center;
+      -ms-flex-align: center;
+          align-items: center;
+}
+
+#register-root .title-rya h1 {
+  font-family: monospace;
+  font-size: 4rem;
+  color: white;
+  padding: 1rem;
+}
+
+#register-root form {
+  display: -webkit-box;
+  display: -ms-flexbox;
+  display: flex;
+  -webkit-box-orient: vertical;
+  -webkit-box-direction: normal;
+      -ms-flex-direction: column;
+          flex-direction: column;
+  background-color: white;
+  border: 1px #c3c3c3 solid;
+  margin: 2% 41%;
+  padding: 0px 10px 0px 20px;
+  width: 13rem;
+  -webkit-box-shadow: 0 3px 7px #333;
+          box-shadow: 0 3px 7px #333;
+}
+
+#register-root form input {
+  font-family: monospace;
+  font-size: 12px;
+  width: 12rem;
+  height: 20px;
+}
+
+#register-root form .btn-box {
+  display: -webkit-box;
+  display: -ms-flexbox;
+  display: flex;
+  -webkit-box-pack: center;
+      -ms-flex-pack: center;
+          justify-content: center;
+  padding-top: 1rem;
+}
+
+#register-root form .btn-box button {
+  width: 6rem;
+  height: 2rem;
+  background-color: #333;
+  color: gold;
+  border-radius: 8px;
+  font-family: unset;
+}
+
+#register-root input {
+  text-align: center;
+}
+
+.signIn-box {
+  display: -webkit-box;
+  display: -ms-flexbox;
+  display: flex;
+  -webkit-box-pack: center;
+      -ms-flex-pack: center;
+          justify-content: center;
+}
+
+.signIn-box .sign-link {
+  color: #85c1e9;
+  cursor: pointer;
+}
+
+.signIn-box h6 {
+  margin-right: 5px;
+}
+
+.signIn-box a {
+  text-decoration: none;
+}
+/*# sourceMappingURL=Register.css.map */

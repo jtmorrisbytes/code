@@ -1,0 +1,102 @@
+#addTrip-root {
+  display: -webkit-box;
+  display: -ms-flexbox;
+  display: flex;
+  -webkit-box-orient: vertical;
+  -webkit-box-direction: normal;
+      -ms-flex-direction: column;
+          flex-direction: column;
+  -webkit-box-align: center;
+      -ms-flex-align: center;
+          align-items: center;
+}
+
+#addTrip-root .trip-info {
+  display: -webkit-box;
+  display: -ms-flexbox;
+  display: flex;
+  -webkit-box-orient: vertical;
+  -webkit-box-direction: normal;
+      -ms-flex-direction: column;
+          flex-direction: column;
+  -webkit-box-align: center;
+      -ms-flex-align: center;
+          align-items: center;
+  background-color: white;
+  width: 15rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background-color: white;
+  width: 20rem;
+  margin: 4rem 0rem 2rem 0rem;
+  -webkit-box-shadow: 0 3px 7px #333;
+          box-shadow: 0 3px 7px #333;
+}
+
+#addTrip-root .trip-info .total-box {
+  display: -webkit-box;
+  display: -ms-flexbox;
+  display: flex;
+  -webkit-box-align: center;
+      -ms-flex-align: center;
+          align-items: center;
+  width: 52%;
+}
+
+#addTrip-root .trip-info .total-box h5 {
+  margin-left: 25%;
+}
+
+#addTrip-root .trip-info .total-box i {
+  margin-left: 18%;
+  cursor: pointer;
+  -webkit-user-select: none;
+     -moz-user-select: none;
+      -ms-user-select: none;
+          user-select: none;
+}
+
+#addTrip-root .trip-info .total-box2 {
+  display: -webkit-box;
+  display: -ms-flexbox;
+  display: flex;
+  -webkit-box-align: center;
+      -ms-flex-align: center;
+          align-items: center;
+  width: 52%;
+}
+
+#addTrip-root .trip-info .total-box2 h5 {
+  margin-left: 20%;
+}
+
+#addTrip-root .trip-info .total-box2 i {
+  margin-left: 18%;
+  cursor: pointer;
+  -webkit-user-select: none;
+     -moz-user-select: none;
+      -ms-user-select: none;
+          user-select: none;
+}
+
+#addTrip-root .trip-info input {
+  width: 10rem;
+  height: 25px;
+  text-align: center;
+}
+
+#addTrip-root .trip-info .upload-btn {
+  background-color: #000000;
+  color: white;
+  height: 18px;
+}
+
+#addTrip-root .trip-info .save-btn {
+  margin: 10px 0px 10px 0px;
+  background-color: #f7dc6f;
+  height: 30px;
+  width: 6rem;
+  border-radius: 3px;
+}
+/*# sourceMappingURL=AddTrip.css.map */

@@ -1,0 +1,1 @@
+This folder for my projects that were copied from github that contain code that can be by themselves or to be integrated into the rust_libraries folder

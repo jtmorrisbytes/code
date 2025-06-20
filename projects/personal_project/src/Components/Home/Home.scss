@@ -1,0 +1,37 @@
+%style-1 {
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+}
+
+.use-inf {
+  padding: 5%;
+}
+
+.greeting-title {
+  display: flex;
+  justify-content: center;
+
+  h1 {
+    margin-left: 5px;
+    color: #f7dc6f;
+  }
+
+  h2 {
+    display: flex;
+    align-items: center;
+  }
+}
+
+.web-des {
+  @extend %style-1;
+
+  h5 {
+    font-size: 2rem;
+    text-align: center;
+  }
+}
+
+.user-direct {
+  @extend %style-1;
+}

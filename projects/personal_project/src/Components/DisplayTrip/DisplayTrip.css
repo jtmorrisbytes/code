@@ -1,0 +1,141 @@
+#root-displytrip {
+  display: -webkit-box;
+  display: -ms-flexbox;
+  display: flex;
+  -webkit-box-orient: vertical;
+  -webkit-box-direction: normal;
+      -ms-flex-direction: column;
+          flex-direction: column;
+  -webkit-box-align: center;
+      -ms-flex-align: center;
+          align-items: center;
+  padding: 2rem;
+}
+
+.trip-container {
+  display: -webkit-box;
+  display: -ms-flexbox;
+  display: flex;
+  -webkit-box-orient: vertical;
+  -webkit-box-direction: normal;
+      -ms-flex-direction: column;
+          flex-direction: column;
+  padding: 5px 5px 5px 5px;
+  width: 20rem;
+  background-color: #f4f4f4;
+}
+
+.trip-container h4 {
+  display: -webkit-box;
+  display: -ms-flexbox;
+  display: flex;
+  -webkit-box-pack: center;
+      -ms-flex-pack: center;
+          justify-content: center;
+  margin: 10px 0px 10px 0px;
+  font-size: 2rem;
+}
+
+.trip-container .box1 {
+  border-bottom: 1px #bdc3c7 solid;
+}
+
+.trip-container .box1 h6 {
+  margin: 0px 0px 1px 0px;
+}
+
+.trip-container .box2 {
+  border-bottom: 1px #bdc3c7 solid;
+}
+
+.trip-container .box2 h6 {
+  margin: 0px 0px 1px 0px;
+}
+
+.trip-container .box3 {
+  border-bottom: 1px #bdc3c7 solid;
+}
+
+.trip-container .box3 h6 {
+  margin: 0px 0px 1px 0px;
+}
+
+.trip-container .box4 {
+  border-bottom: 1px #bdc3c7 solid;
+  overflow-x: scroll;
+  display: -webkit-box;
+  display: -ms-flexbox;
+  display: flex;
+  -webkit-box-align: center;
+      -ms-flex-align: center;
+          align-items: center;
+}
+
+.trip-container .box4 .img-container {
+  display: -webkit-box;
+  display: -ms-flexbox;
+  display: flex;
+  padding: 20px 10px 20px 10px;
+}
+
+.trip-container .box4 .img-container .img-1 {
+  width: 8rem;
+  height: 8rem;
+  border: black 1px solid;
+  background-image: url("https://www.collegehockeyfamilyadvisor.com/wp-content/uploads/2019/01/no-image.jpeg");
+  background-position: center;
+}
+
+.trip-container .box4 .img-container .img-2 {
+  width: 8rem;
+  height: 8rem;
+  border: black 1px solid;
+  margin-left: 2rem;
+  background-image: url("https://www.collegehockeyfamilyadvisor.com/wp-content/uploads/2019/01/no-image.jpeg");
+  background-position: center;
+}
+
+.trip-container .box4 .img-container .img-3 {
+  width: 8rem;
+  height: 8rem;
+  border: black 1px solid;
+  margin-left: 2rem;
+  background-image: url("https://www.collegehockeyfamilyadvisor.com/wp-content/uploads/2019/01/no-image.jpeg");
+  background-position: center;
+}
+
+.trip-container .box5 {
+  border-bottom: 1px #bdc3c7 solid;
+}
+
+.trip-container .box5 h6 {
+  margin: 0px 0px 1px 0px;
+}
+
+.trip-container .box6 {
+  display: -webkit-box;
+  display: -ms-flexbox;
+  display: flex;
+}
+
+.trip-container .box6 h6 {
+  padding: 0 0 0 5px;
+}
+
+.trip-container .box7 {
+  display: -webkit-box;
+  display: -ms-flexbox;
+  display: flex;
+  -webkit-box-pack: justify;
+      -ms-flex-pack: justify;
+          justify-content: space-between;
+}
+
+.trip-container .box7 button {
+  font-family: unset;
+  background-color: #f7dc6f;
+  width: 6rem;
+  height: 2rem;
+  border-radius: 8px;
+}
+/*# sourceMappingURL=DisplayTrip.css.map */

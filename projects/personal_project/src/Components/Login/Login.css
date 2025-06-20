@@ -1,0 +1,90 @@
+body {
+  background-color: #bdc3c7;
+}
+
+#section-root .primary-login {
+  display: -webkit-box;
+  display: -ms-flexbox;
+  display: flex;
+  -webkit-box-orient: vertical;
+  -webkit-box-direction: normal;
+      -ms-flex-direction: column;
+          flex-direction: column;
+  -webkit-box-align: center;
+      -ms-flex-align: center;
+          align-items: center;
+  padding: 5rem;
+}
+
+#section-root .primary-login h1 {
+  font-size: 4rem;
+  color: white;
+  font-family: monospace;
+  margin: 10px 0px 20px;
+}
+
+#section-root .primary-login h2 {
+  font-size: 3rem;
+  color: white;
+  font-family: monospace;
+  margin: 0px 0px 40px;
+}
+
+#section-root .primary-login i {
+  font-size: 10rem;
+  color: #333;
+}
+
+.info-box {
+  display: -webkit-box;
+  display: -ms-flexbox;
+  display: flex;
+  -webkit-box-orient: vertical;
+  -webkit-box-direction: normal;
+      -ms-flex-direction: column;
+          flex-direction: column;
+  -webkit-box-align: center;
+      -ms-flex-align: center;
+          align-items: center;
+}
+
+.info-box input {
+  width: 15rem;
+  height: 20px;
+  text-align: center;
+  margin: 4px 0 25px;
+  font-family: monospace;
+  font-size: 15px;
+}
+
+.info-box button {
+  width: 6rem;
+  height: 2rem;
+  background-color: #333;
+  color: gold;
+  border-radius: 8px;
+  font-family: unset;
+}
+
+.new-user {
+  display: -webkit-box;
+  display: -ms-flexbox;
+  display: flex;
+  -webkit-box-align: center;
+      -ms-flex-align: center;
+          align-items: center;
+}
+
+.new-user h6 {
+  margin-right: 5px;
+}
+
+.new-user .sml-act {
+  color: #3498db;
+  cursor: pointer;
+}
+
+.new-user a {
+  text-decoration: none;
+}
+/*# sourceMappingURL=Login.css.map */
