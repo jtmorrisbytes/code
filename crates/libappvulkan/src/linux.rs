@@ -12,7 +12,7 @@ use crate::bindings::{
     wchar_t, VkAllocationCallbacks, VkBool32, VkDisplayKHR, VkFlags, VkResult, VkStructureType,
     VkSurfaceKHR,
 };
-use crate::VkInstance;
+use crate::bindings::VkInstance;
 
 pub const VK_KHR_xlib_surface: u32 = 1;
 pub const VK_KHR_XLIB_SURFACE_SPEC_VERSION: u32 = 6;
@@ -5318,7 +5318,7 @@ extern "C" {
     ) -> ::std::os::raw::c_int;
     pub fn XFreeEventData(arg1: *mut Display, arg2: *mut XGenericEventCookie);
     pub fn vkCreateXlibSurfaceKHR(
-        instance: VkInstance,
+        instance: crate::bindings::VkInstance,
         pCreateInfo: *const VkXlibSurfaceCreateInfoKHR,
         pAllocator: *const VkAllocationCallbacks,
         pSurface: *mut VkSurfaceKHR,
@@ -5331,7 +5331,7 @@ extern "C" {
     ) -> VkBool32;
 
     pub fn vkCreateWaylandSurfaceKHR(
-        instance: VkInstance,
+        instance: crate::bindings::VkInstance,
         pCreateInfo: *const VkWaylandSurfaceCreateInfoKHR,
         pAllocator: *const VkAllocationCallbacks,
         pSurface: *mut VkSurfaceKHR,
@@ -5372,7 +5372,7 @@ const _: () = {
 };
 pub type PFN_vkCreateWaylandSurfaceKHR = ::std::option::Option<
     unsafe extern "C" fn(
-        instance: VkInstance,
+        instance: crate::bindings::VkInstance,
         pCreateInfo: *const VkWaylandSurfaceCreateInfoKHR,
         pAllocator: *const VkAllocationCallbacks,
         pSurface: *mut VkSurfaceKHR,
@@ -5385,3 +5385,14 @@ pub type PFN_vkGetPhysicalDeviceWaylandPresentationSupportKHR = ::std::option::O
         display: *mut wl_display,
     ) -> VkBool32,
 >;
+
+impl crate::Loader {
+    pub fn vk_create_wayland_surface_khr(
+        instance: crate::bindings::VkInstance,
+        p_create_info: *const VkWaylandSurfaceCreateInfoKHR,
+        p_allocator: *const VkAllocationCallbacks,
+        p_surface: *mut VkSurfaceKHR,
+    ) -> VkResult {
+        todo!()
+    }
+}
