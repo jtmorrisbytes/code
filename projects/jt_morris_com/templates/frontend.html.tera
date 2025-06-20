@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>{{title}}</title>
+    <!-- loads the webassembly module -->
+    <script type="module">
+            import init from "/frontend/frontend.js"
+        (async () => {
+            let wasm = await init();
+            console.dir(wasm)
+            // wasm.__wbindgen_start();
+        })() 
+    </script>
+</head>
+
+<body>
+    <input type="text" hidden=true id="initial-data" value="{{initial_data}}" />
+    {{root}}
+</body>
+
+</html>

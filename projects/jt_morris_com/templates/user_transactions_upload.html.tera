@@ -1,0 +1,63 @@
+{% extends "base" %}
+
+
+{% block title %}
+Upload Transactions
+{% endblock title%}
+
+{%block head%}
+<style>
+    div.error-box {
+        max-height: 500px;
+        overflow: scroll;
+    }
+</style>
+{% endblock head%}
+
+
+{% block body %}
+<h1>Upload Transactions</h1>
+<p>
+    Select a CSV formatted file to upload transactions into the database.
+    Currently only one file at a time can be uploaded. If you would like to upload multiple files,
+    Please use the tool again.
+</p>
+<p>
+    Please note that the time it takes to complete the action can vary from seconds to minutes
+    depending on the size the file and the number of transactions.
+    <br />
+    During this time, please do not navigate away from this page or click the cancel or refresh buttons
+    as this may result in missing or duplicated transactions.
+    <br />
+    It is recommended to use this tool in a seprate browser window or tab and wait for the operation to complete
+</p>
+<a href="/">Go Home</a>
+<form method="POST" enctype="multipart/form-data">
+    <input name="data" type="file" accept=".csv" />
+    <button onclick="addFileToFormOnClick()">Add File</button>
+    <button type="submit">Submit</button>
+</form>
+<p>Successfully Uploaded {{successfully_uploaded}}</p>
+<p>Errors:</p>
+<div>
+    <p>{{database_errors | length}} Database Errors</p>
+    <div class="error-box">
+        {% for error in database_errors %}
+        <span class="error">{{error}}</span><br />
+        {% endfor %}
+    </div>
+</div>
+<div>
+    <p>{{parse_errors | length}} Parse Errors</p>
+    <div class="error-box">
+        {% for error in parse_errors %}
+        <span class="error">{{error}}</span> <br />
+        {% endfor %}
+    </div>
+</div>
+<script type="text/javascript">
+    function addFileToFormOnClick(event) {
+        console.log(event)
+    }
+</script>
+{% endblock body %}

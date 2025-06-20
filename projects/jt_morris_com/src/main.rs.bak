@@ -1,0 +1,35 @@
+use web_server::config::DatabaseConfig;
+use rocket::time;
+
+#[rocket::main]
+pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // defining this function inside the lib allows it to be reused for tests
+    let rocket = web_server::rocket().await?;
+    // rocket.figment().extract_inner::<HashMap<String,rocket_db_pools::Config>>("databases.primary");
+
+    let rocket = rocket.ignite().await?;
+
+    // let (s,mut r) = tokio::sync::mpsc::unbounded_channel();
+    let figment = rocket.figment().to_owned();
+    std::thread::spawn(move || {
+        let config = figment
+            .extract_inner::<DatabaseConfig>("databases.primary")
+            .unwrap();
+        let pool =
+            web_server::db::create_pool(config.url.as_str(), config.max_connections as u32)
+                .unwrap();
+        // let mut conn = pool.get().unwrap();
+        loop {
+            let _ = web_server::auth_state::delete_auth_state_older_than_duration(
+                pool.clone(),
+                time::Duration::minutes(15),
+            );
+            std::thread::sleep(std::time::Duration::from_secs(900))
+        }
+    });
+    let launch = rocket.launch().await;
+
+    // let _ = s.send(()).ok();
+    let _ = launch?;
+    Ok(())
+}

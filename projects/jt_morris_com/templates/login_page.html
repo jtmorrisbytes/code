@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>{title}</title>
+    <!-- loads the webassembly module -->
+    <script type="module">
+        import init from "./login_page.js"
+        (async () => {
+            let wasm = await init();
+            console.dir(wasm)
+            // wasm.__wbindgen_start();
+        })() 
+    </script>
+</head>
+
+<body>
+    {root}
+</body>
+
+</html>
