@@ -1,4 +1,0 @@
-[build]
-# The index HTML file to drive the bundling process.
-target = "yew_frontend/index.html"
-# dist = "../dist"

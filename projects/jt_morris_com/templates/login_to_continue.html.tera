@@ -1,6 +1,0 @@
-{% extends "base" %}
-
-
-{% block body %}
-<a href="{{next_url}}">Click Here to continue</a>
-{% endblock body%}

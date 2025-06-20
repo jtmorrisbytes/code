@@ -1,3 +1,0 @@
-[submodule "diesel"]
-	path = diesel
-	url = https://github.com/diesel-rs/diesel/
