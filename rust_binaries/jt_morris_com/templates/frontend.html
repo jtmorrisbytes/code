@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>{{title}}</title>
+    <link rel="preload" as="fetch" href="/frontend/frontend_bg.wasm" crossorigin="anonymous" />
+    <link rel="preload" href="/frontend/frontend.js" as="script" crossorigin="anonymous" />
+    <script type="module" async>
+            import init from "/frontend/frontend.js"
+        (async () => {
+            let wasm = await init({});
+        })() 
+    </script>
+</head>
+
+<body>
+    <input type="text" hidden=true id="initial-data" value="{{initial_data}}" />
+    {{root}}
+</body>
+
+</html>

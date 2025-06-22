@@ -1,0 +1,15 @@
+[package]
+name="libxorg"
+version="0.1.0"
+edition="2021"
+description="any portable code or code defs for interacting with the x11 windowing system"
+
+[build-dependencies]
+bindgen = "0.72.0"
+
+[dependencies]
+thiserror.workspace = true
+
+[features]
+#enables 'extern "C" fn' blocks
+externs=[]

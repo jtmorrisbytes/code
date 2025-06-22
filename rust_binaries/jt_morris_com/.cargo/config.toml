@@ -1,0 +1,14 @@
+[target.x86_64-pc-windows-msvc]
+# linker = "lld"
+rustflags = ["-Ctarget-cpu=native"]
+
+
+# this target must be compiled from a linux host
+[target.x86_64-unknown-linux-musl]
+rustflags = ["-C", "linker-flavor=ld.lld"]
+
+# this target must be compiled from a linux host
+[target.armv7-unknown-linux-gnueabihf]
+linker = "arm-linux-gnueabihf-gcc"
+[target.aarch64-unknown-linux-gnu]
+linker = "aarch64-linux-gnu-gcc"

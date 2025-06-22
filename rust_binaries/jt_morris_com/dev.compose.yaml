@@ -1,0 +1,35 @@
+version: "3"
+services:
+  postgres:
+    image: postgres:16
+    env_file: .test.env
+    environment:
+      PGUSER: "testuser"
+      PGPASS: "testpassword"
+      PGDATABASE: "testdatabase"
+      PGPORT: 5432
+  web_api:
+    depends_on: 
+      - postgres
+    build:
+      args:
+        DATABASE_URL: $DATABASE_URL
+        ROCKET_PUBLIC_BASE_URL: $ROCKET_PUBLIC_BASE_URL
+      context: .
+      dockerfile: Dockerfile
+    env_file: .test.env
+      
+    environment:
+      PGUSER: "testuser"
+      PGPASS: "testpassword"
+      PGDATABASE: "testdatabase"
+      PGPORT: 5432
+      PUBLIC_BASE_URL: "https://test.jt-morris.com"
+      ROCKET_PUBLIC_BASE_URL: "https://test.jt-morris.com"
+
+      # DATABASE_URL: "postgresql://${PGUSER}:${PGPASS}@postgres:${PGPORT}/${PGDATABASE}"
+      ROCKET_DATABSE_URL: $DATABASE_URL
+      ROCKET_AUTH0_DOMAIN: jt-morris.us.auth0.com
+      ROCKET_AUTH0_CLIENT_ID: oturdIbaS2pC6mhO0cXz2gSlVYdZFgwz
+      ROCKET_ADDRESS: 443
+    

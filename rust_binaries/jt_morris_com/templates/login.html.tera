@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login</title>
+</head>
+<body>
+    <h1>Login</h1>
+    <form action="POST">
+        <input type="text" name="username" autocomplete="username" placeholder="username" required minlength="1" />
+        <br />
+        <input type="text" name="password" autocomplete="current-password" placeholder="password" required minlength="1" />
+        <br />
+        <button type="submit">Login</button>
+    </form>
+    <a href="{{registration_url}}">Create an account</a>
+    <p>Password reset is not supported at this time.<br />We cannot help you if you forget your password afaik</p>
+</body>
+</html>
