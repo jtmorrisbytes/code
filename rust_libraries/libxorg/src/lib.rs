@@ -5,6 +5,9 @@ pub mod extern_function_definitions;
 pub const RLTD_NOW: std::ffi::c_int = 0x0002;
 pub const LIBRARY_NAME_CSTR: &std::ffi::CStr = c"X11";
 
+pub mod x_proto_from_spec;
+
+
 pub mod sys;
 
 
@@ -25,22 +28,22 @@ unsafe extern "C"{
 // }
 
 
-pub struct Display {
-    inner: *mut bindings::_XDisplay
-}
+// pub struct Display {
+//     inner: *mut bindings::_XDisplay
+// }
 
-impl Display {
-    pub fn try_open(path:Option<&str>) -> Result<Self,String> {
-        let ptr = self::x_open_display(path)?;
-        Ok(Self{inner:ptr})
-    }
-}
+// impl Display {
+//     pub fn try_open(path:Option<&str>) -> Result<Self,String> {
+//         let ptr = self::x_open_display(path)?;
+//         Ok(Self{inner:ptr})
+//     }
+// }
 
-impl Drop for Display {
-    fn drop(&mut self) {
-        x_close_display(self.inner);
-    }
-}
+// impl Drop for Display {
+//     fn drop(&mut self) {
+//         x_close_display(self.inner);
+//     }
+// }
 
 macro_rules! call_extern_fn {
     ($name:ident, $($args:expr),*) => {
@@ -65,11 +68,11 @@ macro_rules! call_extern_fn {
 
 
 
-#[test]
-pub fn test_display_try_open() {
-    let disp =  Display::try_open(None).unwrap();
-    let disp = Display::try_open(Some(":1")).unwrap();
-}
+// #[test]
+// pub fn test_display_try_open() {
+//     let disp =  Display::try_open(None).unwrap();
+//     let disp = Display::try_open(Some(":1")).unwrap();
+// }
 
 
 fn str_to_cstring(s: &str) -> std::ffi::CString {
@@ -103,21 +106,21 @@ fn check_mut_pointer_or_return_error<T>(ptr:*mut T) -> Result<(),String> {
 
 }
 
-pub fn x_open_display(path:Option<&str>) -> Result<*mut bindings::_XDisplay,String> {
-    let cstr = map_str_to_cstring(path);
-    let s_ptr = map_cstring_or_else_nullpointer(cstr);
+// pub fn x_open_display(path:Option<&str>) -> Result<*mut bindings::_XDisplay,String> {
+//     let cstr = map_str_to_cstring(path);
+//     let s_ptr = map_cstring_or_else_nullpointer(cstr);
 
-    let ptr = unsafe {bindings::XOpenDisplay(s_ptr)};
-    let _ = check_mut_pointer_or_return_error(ptr)?;
+//     let ptr = unsafe {bindings::XOpenDisplay(s_ptr)};
+//     let _ = check_mut_pointer_or_return_error(ptr)?;
 
-    Ok(ptr)
+//     Ok(ptr)
 
-}
+// }
 
-pub fn x_close_display(dis: *mut bindings::Display) {
+// pub fn x_close_display(dis: *mut bindings::Display) {
 
-    todo!()
-}
+//     todo!()
+// }
 
 
 
