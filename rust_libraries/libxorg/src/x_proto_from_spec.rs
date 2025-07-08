@@ -1757,7 +1757,7 @@ pub fn XOpenDisplay(display_str: &str) -> Result<Display, Box<dyn std::error::Er
     Display::connect(display_str)
 }
 pub fn XCreateWindow(display: &mut Display,parent: WINDOW,x:Card16,y:Card16,width:Card16,height:Card16,border_width:Card16) {
-    display.create_window()
+    display.create_window().unwrap()
 }
 
 pub fn XDefaultRootWindow(display: &mut Display) -> Result<WINDOW,Box<dyn std::error::Error>> {

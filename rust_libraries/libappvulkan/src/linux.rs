@@ -1,5 +1,10 @@
 // compile_error!("TODO: Move any X11 / XORG typedefs into rust_libraries/libxorg");
-use libxorg::bindings::{Display, VisualID, Window, XErrorEvent, XPointer,_XIMStatusDrawCallbackStruct,KeySym};
+
+use x11::xlib::{Display,VisualID,Window,XErrorEvent,XPointer,KeySym};
+
+
+
+// XErrorEvent, XPointer,_XIMStatusDrawCallbackStruct,KeySym};
 
 use crate::bindings::VkPhysicalDevice;
 use crate::bindings::{
@@ -63,7 +68,7 @@ type PFN_vkAcquireXlibDisplayEXT = unsafe extern "C" fn(
 //         [::std::mem::offset_of!(_XIMStatusDrawCallbackStruct, data) - 8usize];
 // };
 #[cfg(target_os = "linux")]
-pub type XIMStatusDrawCallbackStruct = _XIMStatusDrawCallbackStruct;
+pub type XIMStatusDrawCallbackStruct = ();
 #[repr(C)]
 #[cfg(target_os = "linux")]
 #[derive(Debug, Copy, Clone)]

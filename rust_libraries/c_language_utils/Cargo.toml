@@ -1,0 +1,8 @@
+[package]
+name="c_language_utils"
+version="0.1.0"
+edition="2021"
+
+[dependencies]
+nom = "8.0.0"
+thiserror.workspace = true
