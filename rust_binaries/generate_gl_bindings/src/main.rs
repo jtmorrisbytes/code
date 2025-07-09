@@ -24,7 +24,7 @@ fn main() {
     let gl_bindings_dir = bindings_dir_path.join("gl");
     std::fs::create_dir(&gl_bindings_dir).ok();
 
-    let mut mod_rs = String::new();
+    let mut bindings_root_mod_rs = String::new();
 
     // opengl 1.0 - 1.5
 
@@ -45,7 +45,7 @@ fn main() {
             [],
         );
         registry.write_bindings(StructGenerator, &mut file).unwrap();
-        mod_rs = mod_rs + &format!("pub mod {module_name};\n");
+        bindings_root_mod_rs = bindings_root_mod_rs + &format!("pub mod {module_name};\n");
     }
 
     // opengl 2.0-2.1
@@ -74,7 +74,7 @@ fn main() {
             ],
         );
         registry.write_bindings(StructGenerator, &mut file).unwrap();
-        mod_rs = mod_rs + &format!("pub mod {module_name};\n");
+        bindings_root_mod_rs = bindings_root_mod_rs + &format!("pub mod {module_name};\n");
     }
 
     // opengl 3.0 - 3.1
@@ -104,7 +104,7 @@ fn main() {
             ],
         );
         registry.write_bindings(StructGenerator, &mut file).unwrap();
-        mod_rs = mod_rs + &format!("pub mod {module_name};\n");
+        bindings_root_mod_rs = bindings_root_mod_rs + &format!("pub mod {module_name};\n");
     }
 
     // opengl 4.0 - 4.6
@@ -136,8 +136,40 @@ fn main() {
             ],
         );
         registry.write_bindings(StructGenerator, &mut file).unwrap();
-        mod_rs = mod_rs + &format!("pub mod {module_name};\n");
+        bindings_root_mod_rs = bindings_root_mod_rs + &format!("pub mod {module_name};\n");
     }
 
-    std::fs::write(gl_bindings_dir.join("mod.rs"), mod_rs).ok();
+    let mut wgl_file = std::fs::File::options()
+            .create(true)
+            .write(true)
+            .truncate(true)
+            .open(bindings_dir_path.join("wgl.rs"))
+            .unwrap();
+    let wgl_registry = Registry::new(Api::Wgl, (1,0), Profile::Compatibility, Fallbacks::All, []);
+    
+    wgl_registry.write_bindings(StructGenerator, &mut wgl_file).unwrap();
+    bindings_root_mod_rs= bindings_root_mod_rs + "pub mod wgl;\n";
+
+
+    // GLX 1.0 - 1.4
+    let glx_dir = bindings_dir_path.join("glx");
+    std::fs::create_dir(&glx_dir).unwrap();
+    for minor_version in 0..=4 {
+        let mut file = std::fs::File::options()
+            .create(true)
+            .write(true)
+            .truncate(true)
+            .open(glx_dir.join(format!("v1_{minor_version}.rs")))
+            .unwrap();
+        let registry = Registry::new(
+            Api::Glx,
+            (1, minor_version),
+            Profile::Compatibility,
+            Fallbacks::All,
+            [
+            ],
+        );
+        registry.write_bindings(StructGenerator, &mut file).unwrap();
+    }
+    std::fs::write(gl_bindings_dir.join("mod.rs"), bindings_root_mod_rs).ok();
 }

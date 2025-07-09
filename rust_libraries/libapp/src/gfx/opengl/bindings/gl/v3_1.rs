@@ -2436,7 +2436,7 @@ impl Gl {
             #[allow(dead_code, unused_variables)]
             pub fn load_with<F>(mut loadfn: F) -> Gl where F: FnMut(&str) -> *const __gl_imports::raw::c_void {
                 #[inline(never)]
-                fn do_metaloadfn(loadfn: &mut FnMut(&str) -> *const __gl_imports::raw::c_void,
+                fn do_metaloadfn(loadfn: &mut impl FnMut(&str) -> *const __gl_imports::raw::c_void,
                                  symbol: &str,
                                  symbols: &[&str])
                                  -> *const __gl_imports::raw::c_void {
