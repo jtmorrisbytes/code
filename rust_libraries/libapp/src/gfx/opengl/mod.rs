@@ -74,12 +74,49 @@ impl Drop for Library {
 #[cfg(target_os = "windows")]
 pub struct WGLContext;
 
+/// get a string from a glubyte ptr. may panic or cause UB if gl implementation does not nul terminate string!
+pub unsafe fn const_glubyte_ptr_to_string(ptr: *const u8) -> String {
+    // const MAX_LEN: usize = 128;
+    if ptr.is_null() {
+        return String::new();
+    }
+    if !ptr.is_aligned() {
+        return String::new();
+    }
+    let mut buffer = vec![];
+    let mut offset = 0;
+    // attempt to read a u8, one byte at a time, by advancing the pointer by size_of u8, until 0
+    unsafe {
+        loop{
+            let char_ptr = ptr.offset((std::mem::size_of::<u8>() * offset) as isize);
+            if char_ptr.is_null(){
+                break;
+            }
+            if !char_ptr.is_aligned() {
+                break;
+            }
+            let char = *char_ptr;
+            buffer.push(char);
+            if char == 0 {
+                break;
+            }
+            offset = offset + 1;
+        }
+    }
+    std::ffi::CStr::from_bytes_until_nul(&buffer).map(|cstr|cstr.to_string_lossy().to_string()).unwrap_or(String::new())
+}
+
+
+
 #[cfg(unix)]
 pub mod glx {
     use std::i32;
 
     use winit::raw_window_handle::RawDisplayHandle;
     use winit::raw_window_handle::RawWindowHandle;
+    use winit::raw_window_handle::XlibDisplayHandle;
+
+    use crate::gfx::opengl::const_glubyte_ptr_to_string;
 
     use super::bindings;
     use super::Library;
@@ -202,6 +239,21 @@ pub mod glx {
                 } => unsafe { glx.MakeCurrent(*display,*window, *context) != 0 },
             }
         }
+
+        pub fn get_gl_version(&self) -> () {
+            match self {
+                Self::V1_4 { library, context, glx, display, window } => {
+                    let gl = bindings::gl::v1_0::Gl::load_with(|name|library.load_symbol(name));
+                    let s = unsafe {gl.GetString(bindings::gl::v1_1::VERSION)};
+                    let s = unsafe {const_glubyte_ptr_to_string(s)};
+                    dbg!(s);
+                }
+                _=>{todo!()}
+            }
+        }
+        pub fn draw(&mut self) {
+
+        }
     }
     // **** GLX UTILS ******
     #[derive(Debug, PartialEq, Eq)]
@@ -214,19 +266,17 @@ pub mod glx {
     }
     // loads the appropriate GL library for X11, attempts to use glx v1.0 to get the supported version, then returns it
 
-    pub fn glx_get_version_from_xlib(
-        handle: winit::raw_window_handle::XlibDisplayHandle,
+    pub fn glx_get_version_from_xlib(library: &Library,
+        dpy: *mut bindings::glx::types::Display,
     ) -> GLXVersion {
         let mut major: i32 = 0;
         let mut minor: i32 = 0;
-        // need the ability to search these
-        let library = Library::new("/usr/lib/x86_64-linux-gnu/libGL.so");
         let glx: bindings::glx::v1_0::Glx =
             bindings::glx::v1_0::Glx::load_with(|name| library.load_symbol(name));
 
         unsafe {
             glx.QueryVersion(
-                handle.display.unwrap().as_ptr().cast(),
+                dpy,
                 &mut major,
                 &mut minor,
             )
@@ -244,8 +294,10 @@ pub mod glx {
     pub struct GLXAttribs(Vec<std::ffi::c_int>);
 
     pub fn glx_choose_visual(
+        library: &Library,
         glx_version: &GLXVersion,
-        window_handle: winit::raw_window_handle::XlibDisplayHandle,
+        display: *mut bindings::glx::types::Display,
+        screen: bindings::glx::types::Screen,
         use_rgba: bool,
         prefer_double_buffer: bool,
         depth_size: u32,
@@ -256,9 +308,7 @@ pub mod glx {
         sample_buffers_count: u32,
         samples_count: u32,
     ) -> Result<*mut bindings::glx::types::XVisualInfo, ()> {
-        let libgl = Library::new("/usr/lib/x86_64-linux-gnu/libGL.so");
-        let dpy = window_handle.display.unwrap().as_ptr().cast();
-        let screen = window_handle.screen;
+        // let libgl = Library::new("/usr/lib/x86_64-linux-gnu/libGL.so");
 
         let mut attribs: Vec<i32> = Vec::new();
         if use_rgba {
@@ -287,33 +337,34 @@ pub mod glx {
         let visualinfo = match glx_version {
             GLXVersion::V1_0 => {
                 attribs.push(0);
-                let glx = bindings::glx::v1_0::Glx::load_with(|name| libgl.load_symbol(name));
-                unsafe { glx.ChooseVisual(dpy, screen, attribs_ptr) }
+                let glx = bindings::glx::v1_0::Glx::load_with(|name| library.load_symbol(name));
+                unsafe { glx.ChooseVisual(display, screen, attribs_ptr) }
             }
             GLXVersion::V1_1 => {
                 attribs.push(0);
-                let glx = bindings::glx::v1_1::Glx::load_with(|name| libgl.load_symbol(name));
-                unsafe { glx.ChooseVisual(dpy, screen, attribs_ptr) }
+                let glx = bindings::glx::v1_1::Glx::load_with(|name| library.load_symbol(name));
+                unsafe { glx.ChooseVisual(display, screen, attribs_ptr) }
             }
             GLXVersion::V1_2 => {
                 attribs.push(0);
-                let glx = bindings::glx::v1_2::Glx::load_with(|name| libgl.load_symbol(name));
-                unsafe { glx.ChooseVisual(dpy, screen, attribs_ptr) }
+                let glx = bindings::glx::v1_2::Glx::load_with(|name| library.load_symbol(name));
+                unsafe { glx.ChooseVisual(display, screen, attribs_ptr) }
             }
             GLXVersion::V1_3 => {
                 attribs.push(0);
 
-                let glx = bindings::glx::v1_3::Glx::load_with(|name| libgl.load_symbol(name));
+                let glx = bindings::glx::v1_3::Glx::load_with(|name| library.load_symbol(name));
                 // try choosefbconfig first
-                unsafe { glx.ChooseVisual(dpy, screen, attribs_ptr) }
+                unsafe { glx.ChooseVisual(display, screen, attribs_ptr) }
             }
             GLXVersion::V1_4 => {
                 attribs.push(bindings::glx::v1_4::SAMPLES as i32);
                 attribs.push(samples_count.try_into().unwrap_or(0));
                 attribs.push(bindings::glx::v1_4::SAMPLE_BUFFERS as i32);
+                attribs.push(sample_buffers_count as i32);
                 attribs.push(0);
-                let glx = bindings::glx::v1_4::Glx::load_with(|name| libgl.load_symbol(name));
-                unsafe { glx.ChooseVisual(dpy, screen, attribs_ptr) }
+                let glx = bindings::glx::v1_4::Glx::load_with(|name| library.load_symbol(name));
+                unsafe { glx.ChooseVisual(display, screen, attribs_ptr) }
             }
         };
         if visualinfo.is_null() {
@@ -322,24 +373,25 @@ pub mod glx {
         Ok(visualinfo)
     }
     // get the supported opengl version using platform specific apis from a winit window handle
-    pub trait WindowAndDisplayHandle:
-        winit::raw_window_handle::HasDisplayHandle + winit::raw_window_handle::HasWindowHandle
-    {
+    pub fn glx_create_context_from_winit_xlib_handle(display_handle: XlibDisplayHandle,window_handle: winit::raw_window_handle::XlibWindowHandle) -> Result<GLXContext,()> {
+        let display = display_handle.display.unwrap().as_ptr().cast();
+        let screen = display_handle.screen;
+        let window = window_handle.window;
+        let visual_id = window_handle.visual_id;
+        glx_create_context(display,screen,window,visual_id)
     }
-    impl<T> WindowAndDisplayHandle for T where T: winit::raw_window_handle::HasDisplayHandle + winit::raw_window_handle::HasWindowHandle{}
+    
+    
     pub fn glx_create_context(
         // glx_version: GLXVersion,
-        handle: Box<dyn WindowAndDisplayHandle>,
+        display: *mut bindings::glx::types::Display,
+        screen: bindings::glx::types::Screen,
+        window: bindings::glx::types::Window,
+        visualid: bindings::glx::types::VisualID
         // visualinfo: *mut bindings::glx::types::XVisualInfo,
     ) -> Result<GLXContext, ()> {
-        let display_handle = handle.display_handle().unwrap().as_raw();
-        let window_handle = handle.window_handle().unwrap().as_raw();
-        match (window_handle, display_handle) {
-            (RawWindowHandle::Xlib(window), RawDisplayHandle::Xlib(display_handle)) => {
-                let libgl = Library::new("/usr/lib/x86_64-linux-gnu/libGL.so");
-                let glx_version = glx_get_version_from_xlib(display_handle);
-                let display_ptr = display_handle.display.unwrap().as_ptr().cast();
-
+        let libgl = Library::new("/usr/lib/x86_64-linux-gnu/libGL.so");
+        let glx_version = glx_get_version_from_xlib(&libgl,display);
                 match glx_version {
                     GLXVersion::V1_0 => {
                         todo!("GLX create context 1_0")
@@ -357,8 +409,10 @@ pub mod glx {
                         let glx =
                             bindings::glx::v1_4::Glx::load_with(|name| libgl.load_symbol(name));
                         let visualinfo =glx_choose_visual(
+                            &libgl,
                             &glx_version,
-                            display_handle,
+                            display,
+                            screen,
                             true,
                             true,
                             24,
@@ -372,7 +426,7 @@ pub mod glx {
                         .unwrap();
                         let ctx = unsafe {
                             glx.CreateContext(
-                                display_ptr,
+                                display,
                                 visualinfo,
                                 std::ptr::null(),
                                 1,
@@ -388,15 +442,12 @@ pub mod glx {
                             library: libgl,
                             context: ctx,
                             glx,
-                            display: display_ptr,
-                            window:window.window
+                            display: display,
+                            window:window
                         })
                     }
                 }
-            }
-            _ => todo!("window and display handles"),
         }
-    }
 }
 
 pub trait GLContext {}
