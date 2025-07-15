@@ -1,3 +1,6 @@
+
+
+
 pub struct Application {
     window: Option<winit::window::Window>,
     cursor_x: f64,

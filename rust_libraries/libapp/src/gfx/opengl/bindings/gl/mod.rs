@@ -15,3 +15,18 @@ pub mod v4_3;
 pub mod v4_4;
 pub mod v4_5;
 
+pub type GLenum = std::ffi::c_uint;
+pub type GLboolean = std::ffi::c_char;
+pub type GLbitfield = std::ffi::c_uchar;
+pub type GLvoid = std::ffi::c_void;
+pub type GLbyte = std::ffi::c_schar;
+pub type GLshort= std::ffi::c_short;
+pub type GLint = std::ffi::c_int;
+pub type GLubyte = std::ffi::c_uchar;
+pub type GLushort = std::ffi::c_ushort;
+pub type GLuint = std::ffi::c_uint;
+pub type GLsizei = std::ffi::c_int;
+pub type GLfloat = std::ffi::c_float;
+pub type GLclampf = std::ffi::c_float;
+pub type GLdouble = std::ffi::c_double;
+pub type GLclampd = std::ffi::c_double;
