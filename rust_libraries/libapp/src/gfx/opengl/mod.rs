@@ -1,6 +1,12 @@
+#[cfg(unix)]
+use winit::raw_window_handle::RawDisplayHandle;
+
 pub mod bindings;
 #[cfg(unix)]
 pub mod glx;
+#[cfg(target_os="windows")]
+pub mod wgl;
+
 pub unsafe fn load_shared_object(path: &str) -> *mut std::ffi::c_void {
     let cstring_path =
         std::ffi::CString::new(path).expect("Valid rust string during cstring conversion");
@@ -72,9 +78,6 @@ impl Drop for Library {
         }
     }
 }
-#[cfg(target_os = "windows")]
-pub struct WGLContext;
-
 /// get a string from a glubyte ptr. may panic or cause UB if gl implementation does not nul terminate string!
 pub unsafe fn const_glubyte_ptr_to_string(ptr: *const u8) -> String {
     // const MAX_LEN: usize = 128;
@@ -109,8 +112,137 @@ pub unsafe fn const_glubyte_ptr_to_string(ptr: *const u8) -> String {
 
 
 
-/*
-pub struct AttribsListBuilder{
-r#use_gl: Option<bool>,
 
-} */
+pub enum OpenGLContextKind {
+        #[cfg(unix)]
+    GLX(glx::GLXContext),
+    #[cfg(target_os="windows")]
+    WGL(self::wgl::WGLContext)
+}
+
+impl LoadGLFunctionAsMutCVoid for OpenGLContextKind {
+    fn load_gl_function_as_mut_c_void(&self,name: &str) -> *mut std::ffi::c_void {
+        match self {
+            #[cfg(unix)]
+            Self::GLX(ctx)=>{
+                (Box::new(ctx) as Box<dyn LoadGLFunctionAsMutCVoid>).load_gl_function_as_mut_c_void(name)
+            }
+            #[cfg(target_os="windows")]
+            Self::WGL(ctx)=>{
+                (Box::new(ctx) as Box<dyn LoadGLFunctionAsMutCVoid>).load_gl_function_as_mut_c_void(name)
+            }
+        }
+    }
+}
+impl LoadGLFunctionAsMutCVoid for &OpenGLContextKind {
+    fn load_gl_function_as_mut_c_void(&self,name: &str) -> *mut std::ffi::c_void {
+        match *self {
+            #[cfg(unix)]
+            OpenGLContextKind::GLX(ctx)=>{
+                (Box::new(ctx) as Box<dyn LoadGLFunctionAsMutCVoid>).load_gl_function_as_mut_c_void(name)
+            }
+            #[cfg(target_os="windows")]
+            OpenGLContextKind::WGL(ctx)=>{
+                (Box::new(ctx) as Box<dyn LoadGLFunctionAsMutCVoid>).load_gl_function_as_mut_c_void(name)
+            }
+        }
+    }
+}
+
+
+pub struct OpenGL1_0Context {
+   kind: OpenGLContextKind,
+   loader: bindings::gl::v1_0::Gl,
+//    library: Library
+}
+
+
+
+
+pub trait LoadGLFunctionAsMutCVoid {
+    fn load_gl_function_as_mut_c_void(&self,name: &str) -> *mut std::ffi::c_void;
+}
+
+
+
+impl OpenGL1_0Context {
+    pub fn try_new(window_handle: winit::raw_window_handle::RawWindowHandle,display_handle: winit::raw_window_handle::RawDisplayHandle) -> Result<Self,()> {
+        use winit::raw_window_handle::RawWindowHandle;
+        let ctx = match (window_handle,display_handle) {
+            #[cfg(unix)] 
+                (RawWindowHandle::Xlib(window_handle),RawDisplayHandle::Xlib(display_handle))=>{
+                    let ctx = self::glx::glx_create_context_from_winit_xlib_handle(display_handle, window_handle).unwrap();
+                    OpenGLContextKind::GLX(ctx)
+                }
+                #[cfg(target_os="windows")]
+                (RawWindowHandle::Win32(window_handle),_) => {
+                    let hwnd = windows::Win32::Foundation::HWND(window_handle.hwnd.get() as *mut std::ffi::c_void);
+                    if hwnd.is_invalid() {
+                        panic!("invalid window handle")
+                    }
+                    let dc = self::wgl::get_device_context(Some(hwnd)).unwrap();
+                    let ctx = self::wgl::create_context(hwnd,Some(dc)).unwrap();
+                    OpenGLContextKind::WGL(ctx)
+                }
+                unimplemented=> {
+                    todo!("{unimplemented:?}")
+                }
+                
+            };
+            let gl = bindings::gl::v1_0::Gl::load_with(|name| (Box::new(&ctx) as Box<dyn LoadGLFunctionAsMutCVoid>).load_gl_function_as_mut_c_void(name));
+            Ok(Self{
+                kind:ctx,
+                loader:gl
+            })
+
+    }
+    pub fn make_current(&self) {
+        match self.kind {
+            #[cfg(unix)]
+            OpenGLContextKind::GLX(ref ctx) => {ctx.make_current();},
+            #[cfg(target_os="windows")]
+            OpenGLContextKind::WGL(ref ctx) => {
+                ctx.make_current();
+            }
+        }
+    }
+    pub fn get_opengl_version_string(&self) -> String {
+                match self.kind {
+            #[cfg(unix)]
+            OpenGLContextKind::GLX(ref ctx) => {ctx.get_gl_version().unwrap()},
+            #[cfg(target_os="windows")]
+            OpenGLContextKind::WGL(ref ctx) => {
+                ctx.get_gl_version();
+                String::new()
+            }
+        }
+    }
+    pub fn gl_get_error(&self) -> bindings::gl::v1_0::types::GLenum{
+        unsafe {self.loader.GetError()}
+    }
+    pub fn gl_begin(&self, mode: bindings::gl::v1_0::types::GLenum) -> Result<(),bindings::gl::v1_0::types::GLenum>{
+        // clear the error flag
+        let _ = self.gl_get_error();
+        unsafe {self.loader.Begin(mode)}
+        let err = self.gl_get_error();
+        if err == 0 {
+            return Ok(())
+        }
+        else {return Err(err);}
+    }
+    pub fn gl_end(&self) -> Result<(),bindings::gl::v1_0::types::GLenum> {
+        // clear the error flag
+        let _ = self.gl_get_error();
+        // call the function
+        unsafe {self.loader.End()}
+        let err = self.gl_get_error();
+        if err == 0 {
+            return Ok(())
+        }
+        else {return Err(err)}
+    }
+    pub fn gl_clear_color(&self,red:bindings::gl::v1_0::types::GLfloat,green:bindings::gl::v1_0::types::GLfloat,blue:bindings::gl::v1_0::types::GLfloat,alpha:bindings::gl::v1_0::types::GLfloat) {
+        unsafe {self.loader.ClearColor(red, green, blue, alpha);}
+    }
+    pub fn gl_clear(&self,mask: bindings)
+}

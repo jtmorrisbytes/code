@@ -1,17 +1,17 @@
-use libapp::gfx::opengl::glx::{GLXVersion};
 use winit::{
-    event::WindowEvent, platform::{wayland::EventLoopBuilderExtWayland, x11::EventLoopBuilderExtX11}, raw_window_handle::{
+    event::WindowEvent, raw_window_handle::{
         DisplayHandle, HasDisplayHandle, HasRawDisplayHandle, HasRawWindowHandle, HasWindowHandle, RawDisplayHandle, RawWindowHandle
     }, window::WindowAttributes
 };
 
 struct TestApp {
     window: Option<winit::window::Window>,
-    context: Option<libapp::gfx::opengl::glx::GLXContext>
+    context: Option<libapp::gfx::opengl::OpenGL1_0Context>
 }
 impl winit::application::ApplicationHandler for TestApp {
     fn resumed(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {
         // iniitalize the graphics engine (opengl) using winit and raw window handles. opengl requires a window to be created to obtain a context. even if not visible
+
 
         // create an opengl context
         self.window.replace(
@@ -30,19 +30,13 @@ impl winit::application::ApplicationHandler for TestApp {
         let raw_display_handle = display_handle.as_raw();
         let raw_window_handle = window_handle.as_raw();
         
-        let ctx = match (raw_display_handle,raw_window_handle) {
-            (RawDisplayHandle::Xlib(display_handle),RawWindowHandle::Xlib(window_handle)) => {
-                libapp::gfx::opengl::glx::glx_create_context_from_winit_xlib_handle(display_handle, window_handle).unwrap()
-
-            },
-            unimpl=>{
-                unimplemented!("{unimpl:?}")
-            }
-        };
-        dbg!(ctx.make_current());
-        dbg!(ctx.is_direct());
-        dbg!(ctx.get_gl_version());
+        let ctx = libapp::gfx::opengl::OpenGL1_0Context::try_new(raw_window_handle, raw_display_handle);
         self.context.replace(ctx);
+        let context = self.context.as_ref().unwrap();
+        context.make_current();
+
+        
+
 
         // request the supported gl version. Im crazy, but I plan to support as low as GL 1.0
     }
@@ -72,10 +66,15 @@ impl TestApp {
     }
 }
 pub fn main() {
-    let event_loop = winit::event_loop::EventLoop::builder()
-        .with_wayland()
-        .with_x11()
-        .build()
+    let mut event_loop = winit::event_loop::EventLoop::builder();
+    let mut _event_loop= &mut event_loop;
+    #[cfg(unix)]{
+        use winit::platform::{wayland::EventLoopBuilderExtWayland, x11::EventLoopBuilderExtX11};
+        _event_loop = _event_loop.with_wayland()
+        .with_x11();
+    }
+
+    let event_loop = _event_loop.build()
         .unwrap();
 
     let mut app = TestApp { window: None, context:None };
