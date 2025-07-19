@@ -544,33 +544,13 @@ const GL_ALL_ATTRIB_BITS: types::GLenum = 0xFFFFFFFF;
 
 
 
-#[cfg(unix)]
-#[link(name="libGL")]
-pub unsafe extern "C" {
-    pub fn glXGetProcAddress(proc_name: *const types::GLubyte) -> *const types::GLvoid;
-}
-
-
-// minimum supported OPENGL 1_1
-pub fn load_gl_function(name: &str) -> *mut types:: GLvoid {
-    let cstring = std::ffi::CString::new(name).unwrap_or_default();
-    #[cfg(target_os="windows")] {
-        let cstring_bytes = cstring.as_bytes_with_nul();
-        let ptr = windows::core::PCSTR(cstring_bytes.as_ptr());
-        let fn_ptr = windows::Win32::Graphics::OpenGL::wglGetProcAddress(ptr);
-        std::mem::transmute::<_,*mut types::GLvoid>(fn_ptr)
-    }
-    #[cfg(unix)] {
-
-    }
-}
-
-
+// TODO: EGL on supported systems, fall back to WGL,GLX,CGL,ETC?
 
 
 /*
  * Miscellaneous
  */
+
 
 GLAPI void GLAPIENTRY glClearIndex( GLfloat c );
 
