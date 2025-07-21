@@ -10,4 +10,6 @@ windows={version="0.61",features=["Win32","Win32_Foundation","Win32_System_Libra
 x11 = "2.21.0"
 
 [dependencies]
+gl = "0.14.0"
 glutin = {version="0.32.3"}
+glfw = "0.59.0"
