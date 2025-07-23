@@ -1,15 +1,15 @@
-#version 330 core
+#version 300 es
+precision mediump float;
 layout (location = 0) in vec3 aPos;
+
+
 
 uniform mat4 model;
 uniform mat4 view;
 uniform mat4 projection;
 
-out vec3 vColorOut;
-
 void main()
 {
-    //gl_Position = projection * view * model * vec4(aPos, 1.0);
-    gl_Position = projection * vec4(aPos,1.0);
-    vColorOut = vec3(1,1,1);
+    //gl_Position = projection * view * model * vec4(aPos.x,aPos.y,aPos.z, 1.0);
+    gl_Position =  model * view * projection * vec4(aPos.x,aPos.y,aPos.z, 1.0);
 }

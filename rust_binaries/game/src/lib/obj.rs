@@ -15,6 +15,9 @@ impl Obj {
     pub fn verticies<'a>(&'a self) -> &'a std::collections::BTreeMap<u32,Vertex4f> {
         &self.vertices
     }
+    pub fn into_verticies(&self) -> std::collections::BTreeMap<u32,Vertex4f> {
+        self.vertices.to_owned()
+    }
     
 }
 
