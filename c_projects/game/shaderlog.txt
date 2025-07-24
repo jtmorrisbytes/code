@@ -1,0 +1,3 @@
+Vertex info
+-----------
+(0) : error C5145: must write to gl_Position
