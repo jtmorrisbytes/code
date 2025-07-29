@@ -4,6 +4,9 @@
 #include <stdlib.h>
 #include "./include/libgame.h"
 
+void libapp_debug_message_callback(GLenum type,GLuint id, GLenum severity, GLsizei length,const GLchar *message, const void *user_param) {
+    puts("Debug message generated");
+}
 
 GLenum libgame_gl_create_shader_object(GLenum shader_kind, GLuint *shader_id) {
     // clear the error flag
@@ -35,7 +38,7 @@ GLboolean libgame_gl_shader_compiler_is_supported(void) {
     return compiler_is_supported;
 }
 
-void *libgame_compile_shader(const char *path, GLenum shader_kind,GLuint *out_program_id,GLuint *out_shader_id) {
+void libgame_compile_shader(const char *path, GLenum shader_kind,GLuint *out_program_id,GLuint *out_shader_id) {
     // Check for shader compiler support
 
     if(!libgame_gl_shader_compiler_is_supported()) {
@@ -71,11 +74,11 @@ void *libgame_compile_shader(const char *path, GLenum shader_kind,GLuint *out_pr
         fclose(fp);
         return;
     }
-    memset(mem,0,file_size);
+    memset(mem,0x1A,file_size);
     buffer = (GLchar*)mem;
 
     size_t bytes_read = fread(buffer,1,file_size,fp);
-
+    
     int close_status = fclose(fp);
     if (close_status != 0){
         char string[255]= {0};
@@ -83,6 +86,7 @@ void *libgame_compile_shader(const char *path, GLenum shader_kind,GLuint *out_pr
         puts(string);
         exit(-1);
     }
+    puts(buffer);
     
     if ((long)bytes_read < file_size) {
         char error[255] = {0};
@@ -115,6 +119,7 @@ void *libgame_compile_shader(const char *path, GLenum shader_kind,GLuint *out_pr
         puts("Failed to attach shader object to program object");
     }    
     // set the shader source
+    buffer[file_size * sizeof(GLchar) +1] = "\x00";
     glShaderSource(shader_id,1,&buffer,NULL);
     free(buffer);
     // if this was sccessfull
@@ -148,17 +153,18 @@ void *libgame_compile_shader(const char *path, GLenum shader_kind,GLuint *out_pr
         infologbuffer[logSize * sizeof(GLchar) + 1] = 0;
         GLsizei actual_len = 0;
         glGetProgramInfoLog(program_id,logSize * sizeof(GLchar),&actual_len,&infologbuffer);
-        FILE *infolog = fopen("shaderlog.txt","wb");
-        if (infolog == NULL) {
-            puts("failed to open log file");
-            return;
-        }
-        printf("len %d",actual_len);
-        fwrite(&infologbuffer,sizeof(GLchar),actual_len,infolog);
-        fflush(infolog);
-        if(fclose(infolog) !=0) {
-            puts("failed to close log file");
-        }
+        puts(infologbuffer);
+        // FILE *infolog = fopen("shaderlog.txt","wb");
+        // if (infolog == NULL) {
+        //     puts("failed to open log file");
+        //     return;
+        // }
+        // printf("len %d",actual_len);
+        // fwrite(&infologbuffer,sizeof(GLchar),actual_len,infolog);
+        // fflush(infolog);
+        // if(fclose(infolog) !=0) {
+        //     puts("failed to close log file");
+        // }
         free(infologbuffer);
     }
     *out_program_id = program_id;
@@ -171,7 +177,7 @@ int main() {
     glfwInitHint(GLFW_OPENGL_DEBUG_CONTEXT,GL_TRUE);
     glfwInitHint(GLFW_CONTEXT_VERSION_MAJOR,3);
     glfwInitHint(GLFW_CONTEXT_VERSION_MINOR,0);
-    glfwInitHint(GLFW_OPENGL_FORWARD_COMPAT,0);
+    glfwInitHint(GLFW_OPENGL_FORWARD_COMPAT,GL_FALSE);
     glfwInit();
 
     // initialize window
@@ -185,6 +191,7 @@ int main() {
 
     // init glad loader
     gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
+    glDebugMessageCallbackARB(libapp_debug_message_callback,NULL);
 
     // initialize opengl
     glClearColor(0.5,0.5,0.5,1.0);
@@ -201,17 +208,19 @@ int main() {
 
 
     // create a vertex buffer object
-    GLuint VBO = 0;
+    GLuint VBO = -1;
     glGenBuffers(1,&VBO);
     glBindBuffer(GL_ARRAY_BUFFER,VBO);
 
+    GLuint VAO  = -1;
+    glGenVertexArrays(1,&VAO);
+    glBindVertexArray(VAO);
     // we are rendering a single triangle to the screen
         float vertices[] = {
         0.0f, 0.0f, 0.0f, // Point 1
         0.5f, 0.5f, 0.0f, // Point 2
         -0.5f, 0.0f, 0.0f  // Point 3
     };
-    
     
     while (!glfwWindowShouldClose(window)) {
         // poll for events
@@ -228,7 +237,9 @@ int main() {
         glClear(GL_COLOR_BUFFER_BIT);
         
         // draw
-        glBufferData(GL_ARRAY_BUFFER,sizeof(vertices),vertices,GL_STATIC_DRAW);
+        glBufferData(GL_ARRAY_BUFFER,sizeof(vertices),vertices,GL_STATIC_COPY);
+        glVertexAttribPointer(0,3,GL_FLOAT,GL_TRUE,sizeof(GLfloat),NULL);
+        glEnableVertexAttribArray(0);
         glDrawArrays(GL_POINT,0,sizeof(vertices));
 
         // swap buffers

@@ -1,21 +1,20 @@
 use std::io::BufRead;
-use super::Vertex4f;
 
 const VERTEX: &str = "v";
 const COMMENT: &str = "#";
 const FACE: &str = "f";
 
 pub struct Obj{
-    vertices: std::collections::BTreeMap<u32,Vertex4f>
+    vertices: std::collections::BTreeMap<u32,glam::Vec4>
 }
 impl Obj {
-    pub fn list_verticies(&self) -> Vec<Vertex4f> {
+    pub fn list_verticies(&self) -> Vec<glam::Vec4> {
         self.vertices.values().into_iter().map(|v| v.to_owned()).collect()
     }
-    pub fn verticies<'a>(&'a self) -> &'a std::collections::BTreeMap<u32,Vertex4f> {
+    pub fn verticies<'a>(&'a self) -> &'a std::collections::BTreeMap<u32,glam::Vec4> {
         &self.vertices
     }
-    pub fn into_verticies(&self) -> std::collections::BTreeMap<u32,Vertex4f> {
+    pub fn into_verticies(&self) -> std::collections::BTreeMap<u32,glam::Vec4> {
         self.vertices.to_owned()
     }
     
@@ -35,7 +34,7 @@ pub fn parse_obj(path: &str) -> Result<Obj, Box<dyn std::error::Error>> {
     let mut file = std::io::BufReader::new(std::fs::File::open(path)?);
     let mut line = String::new();
     let mut vertex_index: u32 = 0;
-    let mut vertices: std::collections::BTreeMap<u32,Vertex4f> = std::collections::BTreeMap::new();
+    let mut vertices: std::collections::BTreeMap<u32,glam::Vec4> = std::collections::BTreeMap::new();
     while let Ok(bytes) = file.read_line(&mut line) {
         // Ok(0) == end of file
         if bytes == 0 {
@@ -43,12 +42,13 @@ pub fn parse_obj(path: &str) -> Result<Obj, Box<dyn std::error::Error>> {
         }
         // # this is a comment
         if line.starts_with(COMMENT) {
+            file.read_line(&mut line).ok();
             continue;
         }
         if line.len() <1 {
             continue;
         }
-        println!("{line}");
+        // println!("{line}");
         let command_index = line.find(" ");
         if command_index.is_none() {
             continue;
@@ -64,7 +64,7 @@ pub fn parse_obj(path: &str) -> Result<Obj, Box<dyn std::error::Error>> {
                 let y:f32 = split.next().ok_or("Missing y coordinate of vertex in vertex command")?.parse().map_err(|e| format!("Error while parsing Y coordinate of Vertex in OBJ file: {e}"))?;
                 let z:f32 = split.next().ok_or("Missing z coordinate of vertex in vertex command")?.parse().map_err(|e| format!("Error while parsing Z coordinate of Vertex in OBJ file: {e}"))?;
                 let w:f32 = split.next().unwrap_or("1.0").parse().unwrap_or(1.0);
-                let vertex = Vertex4f::new(x,y,z,w);
+                let vertex = glam::vec4(x,y,z,w);
                 vertices.insert(vertex_index,vertex);
                 // println!("{parameters}");
                 vertex_index = vertex_index + 1;

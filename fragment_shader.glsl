@@ -1,10 +1,10 @@
-#version 300 es // Specify the GLSL version
+#version 300 es
 precision mediump float;
-in vec4 gl_FragCoord;
-
-out vec4 fragColor; // Declare the output variable for the fragment color
+// in vec3 fragPos;
+out vec4 fragColor;
 
 void main()
 {
-    fragColor = vec4(gl_FragCoord.x, gl_FragCoord.y, gl_FragCoord.z, gl_FragCoord.w); // Set the fragment color to red (RGBA)
+            // float x_color = clamp(abs(fragPos.x),0.25,1.0);
+            fragColor = vec4(1.0, 1.0, 1.0, 1.0); // Red color
 }
