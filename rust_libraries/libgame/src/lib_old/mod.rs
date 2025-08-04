@@ -47,6 +47,7 @@ pub struct Game {
     frame_count: u64,
     // right now, we only have support for one global vertex shader
     vertex_shader: Shader,
+    fragment_shader: Shader,
     projection_matrix: [f32; 16],
     view_matrix: [f32; 16],
     // camera: Camera,
@@ -71,10 +72,14 @@ pub struct Shader {
     program_id: gl::types::GLuint,
 }
 impl Shader {
-    pub fn create_from_file(kind: gl::types::GLenum, path: &str) -> Result<Self, String> {
+    pub fn create_from_file(
+        kind: gl::types::GLenum,
+        path: &str,
+        program_id: Option<gl::types::GLuint>,
+    ) -> Result<Self, String> {
         // compile shader on the fly
         let shader_id = unsafe { gl::CreateShader(kind) };
-        let program_id = unsafe { gl::CreateProgram() };
+        let program_id = program_id.unwrap_or(unsafe { gl::CreateProgram() });
         unsafe {
             gl::AttachShader(program_id, shader_id);
         }
@@ -130,17 +135,16 @@ impl Game {
         unsafe {
             gl::Enable(gl::PROGRAM_POINT_SIZE);
             gl::Enable(gl::VERTEX_PROGRAM_POINT_SIZE);
+            gl::Enable(gl::DEPTH_TEST)
         }
 
         unsafe {
             gl::DebugMessageCallback(Some(debug_message_callback), std::ptr::null());
         }
-        let vertex_shader = Shader::create_from_file(gl::VERTEX_SHADER, "vertex_shader.glsl")
-            .expect("Vertex shader to be created");
-        unsafe {
-            gl::UseProgram(vertex_shader.program_id());
-        }
-
+        let program_id = unsafe { gl::CreateProgram() };
+        let vertex_shader =
+            Shader::create_from_file(gl::VERTEX_SHADER, "vertex_shader.glsl", Some(program_id))
+                .expect("Vertex shader to be created");
         // // projection matrix
         // let projection_index = vertex_shader
         //     .try_get_uniform_location("projection")
@@ -178,14 +182,21 @@ impl Game {
         // unsafe { gl::UniformMatrix4fv(model_matrix_location, 1, gl::FALSE, model_matrix.as_ptr()) }
 
         // fragment shader
-        let fragment_shader = Shader::create_from_file(gl::FRAGMENT_SHADER, "fragment_shader.glsl")
-            .expect("Fragment shader to be created");
-        unsafe { gl::UseProgram(fragment_shader.program_id()) }
-
+        let fragment_shader = Shader::create_from_file(
+            gl::FRAGMENT_SHADER,
+            "fragment_shader.glsl",
+            Some(program_id),
+        )
+        .expect("Fragment shader to be created");
+        // unsafe { gl::UseProgram(fragment_shader.program_id()) }
+        unsafe {
+            gl::UseProgram(vertex_shader.program_id());
+        }
         Self {
             frame_count: 0,
             scene: scene,
             vertex_shader,
+            fragment_shader,
             projection_matrix,
             // camera,
             view_matrix: view_matrix,
@@ -202,7 +213,7 @@ impl Game {
     pub fn render(&mut self) {
         // clear the screen and set the viewport
 
-        opengl::gl_clear(gl::COLOR_BUFFER_BIT);
+        opengl::gl_clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
         // opengl::gl_viewport(0, 0, self.window.get_size().0, self.window.get_size().1);
 
         // set the view matrix for this frame
@@ -226,30 +237,31 @@ impl Game {
             if !program_state_is_valid {
                 eprintln!("Warining: vertex shader program is not in a valid state and may not run")
             }
-            unsafe {
-                gl::UseProgram(self.vertex_shader.program_id());
-            }
 
-            unsafe {
-                gl::Uniform3f(
-                    self.vertex_shader
-                        .try_get_uniform_location("local_space_rotation")
-                        .unwrap_(),
-                    rotation.0,
-                    rotation.1,
-                    rotation.2,
-                );
+            unsafe {gl::UseProgram(self.vertex_shader.program_id());}
+            // only send the uniform if it is present
+            if let Ok(uniform_location) = self
+                .vertex_shader
+                .try_get_uniform_location("local_space_rotation")
+            {
+                unsafe {
+                    gl::Uniform3f(uniform_location, rotation.0, rotation.1, rotation.2);
+                    let status = gl::GetError();
+                    if status != gl::NO_ERROR {
+                        println!("Failed to send local_space_rotation: {status}");
+                    }
+                }
             }
-            unsafe {
-                gl::Uniform3f(
-                    self.vertex_shader
-                        .try_get_uniform_location("local_space_origin")
-                        .unwrap(),
-                    local_space_origin.x,
-                    local_space_origin.y,
-                    local_space_origin.z,
-                );
-            }
+            // unsafe {
+            //     gl::Uniform3f(
+            //         self.vertex_shader
+            //             .try_get_uniform_location("local_space_origin")
+            //             .unwrap(),
+            //         local_space_origin.x,
+            //         local_space_origin.y,
+            //         local_space_origin.z,
+            //     );
+            // }
             // data.push(1.0);
             // data.push(1.0);
             // data.push(1.0);

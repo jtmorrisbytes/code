@@ -294,6 +294,30 @@ pub fn gl_validate_program(program:u32) -> Result<bool,gl::types::GLenum> {
     Ok(validate_status as u8 != gl::FALSE)
 }
 
+pub fn gl_is_program(program: gl::types::GLuint) -> bool {
+    unsafe {gl::IsProgram(program)!= gl::FALSE} 
+}
+
+
+pub fn gl_attach_shader(program: gl::types::GLuint,shader: gl::types::GLuint) -> Result<(),gl::types::GLenum> {
+    if !gl_is_valid_shader(shader) {
+        return Err(gl::INVALID_VALUE);
+    }
+    if !gl_is_program(program) {
+        return Err(gl::INVALID_VALUE);
+    }
+    gl_clear_error_flag();
+    unsafe {
+        gl::AttachShader(program, shader);
+    }
+    let status = gl_get_error();
+    if status != gl::NO_ERROR {
+        Err(status)
+    }
+    else {
+        Ok(())
+    }
+}
 
 pub fn gl_use_program(program_id:u32) {
     
@@ -301,4 +325,82 @@ pub fn gl_use_program(program_id:u32) {
         gl::ValidateProgram(program_id);
         gl::UseProgram(program_id)
     }
+}
+
+
+pub fn gl_create_program() -> gl::types::GLuint {
+    let program_id = unsafe {
+        gl::CreateProgram()
+    };
+
+    program_id
+}
+pub fn gl_link_program(program: gl::types::GLuint) {
+
+    if !gl_is_program(program) {
+        panic!("Invalid shader program {program}")
+    }
+    unsafe {
+        gl::LinkProgram(program);
+    }
+}
+
+pub struct VertexShader;
+impl VertexShader {
+    pub fn id(&self) -> u32 {
+        0
+    }
+}
+
+pub struct FragmentShader {
+    
+}
+impl FragmentShader {
+    pub fn id(&self) -> u32 {
+        0
+    }
+}
+
+
+pub struct ProgramBuilder{
+    vertex_shader:Option<VertexShader>,
+    fragment_shader:Option<FragmentShader>
+}
+
+impl ProgramBuilder {
+    pub fn new() -> Self {
+        Self {
+            vertex_shader: None,
+            fragment_shader: None
+        }
+    }
+    pub fn with_vertex_shader(self,shader: VertexShader)->Self{
+        Self {vertex_shader: Some(shader),fragment_shader:self.fragment_shader}
+    }
+    pub fn with_fragment_shader(self,shader:FragmentShader) -> Self{
+        Self {fragment_shader: Some(shader),vertex_shader:self.vertex_shader}
+
+    }
+    pub fn link(self) -> Result<Program,gl::types::GLenum> {
+        let program_id = gl_create_program();
+
+        if let Some(vertex_shader) = self.vertex_shader {
+            gl_attach_shader(program_id,vertex_shader.id())?;
+        }
+        if let Some(fragment_shader) = self.fragment_shader {
+            gl_attach_shader(program_id,fragment_shader.id())?;
+        }
+        gl_link_program(program_id);
+        todo!()
+
+    }
+}
+
+
+
+pub struct Program {}
+
+
+impl Program {
+    pub fn r#use(){}
 }

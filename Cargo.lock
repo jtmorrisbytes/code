@@ -2755,6 +2755,14 @@ name = "libdb"
 version = "0.1.0"
 
 [[package]]
+name = "libdns"
+version = "0.1.0"
+
+[[package]]
+name = "libgame"
+version = "0.1.0"
+
+[[package]]
 name = "libloading"
 version = "0.8.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2779,6 +2787,13 @@ dependencies = [
  "bitflags 2.9.1",
  "libc",
  "redox_syscall",
+]
+
+[[package]]
+name = "libwayland"
+version = "0.1.0"
+dependencies = [
+ "libdns",
 ]
 
 [[package]]

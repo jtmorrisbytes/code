@@ -39,10 +39,10 @@ impl Actor for Cube {
         // self.position.y = self.position.y - 0.001;
         // self.position.x = self.position.x - 0.001;
         // self.position.z = self.position.z - 0.001;
-        if self.x_rotation > 360.0000000 {
+        if self.x_rotation > 359.999999 {
             self.x_rotation = 0.0_f32.to_degrees();
         }
-        self.x_rotation = self.x_rotation + 0.0000001_f32.to_degrees();
+        self.x_rotation = self.x_rotation + 0.0001_f32.to_degrees();
 
         if self.y_rotation > 360.0000000 {
             self.y_rotation = 0.0_f32.to_degrees();

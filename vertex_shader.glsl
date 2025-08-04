@@ -1,7 +1,5 @@
-#version 300 es
-precision mediump float;
-
-layout (location=0) vec4 aPos;
+#version 330
+layout (location=0) in vec4 aPos;
 
 out vec3 fragPos; 
 uniform mat4 model;
@@ -49,20 +47,29 @@ void main()
     // calculate and perform local space transformations
     // normalize the vertex position, assuming the position of the vertex could
     // be other than the 'origin' (0,0,0)
-    //vec3 vertex_in_local_space = local_space_origin;
-    
+    vec3 vertex_in_local_space = aPos.xyz;    
     /*
       rotate the X coordinate about the axis (0,0,0)
       before applying translations and after applying scaling
     */
 
 
-  //    vec3 final_vertex_pos = local_space_rotationX_matrix3(local_space_rotation.x) * vertex_in_local_space;
-  //  final_vertex_pos = local_space_rotationY_matrix4(local_space_rotation.y) * final_vertex_pos;
-    //final_vertex_pos = local_space_rotationZ_matrix4(local_space_rotation.z) * final_vertex_pos;
+
+    
 
 
-    gl_Position = aPos,1.0;
-    gl_PointSize = 10.0; // Set point size (e.g., 10 pixels)
+
+   // y axis
+    vec3 fvy_pos = vertex_in_local_space;
+    fvy_pos.x = vertex_in_local_space.x * cos(local_space_rotation.y) + vertex_in_local_space.z * sin(local_space_rotation.y);
+    fvy_pos.z = -vertex_in_local_space.x * sin(local_space_rotation.y) + vertex_in_local_space.z * cos(local_space_rotation.y);
+
+    // x axis
+    vec3 fvx_pos = fvy_pos;
+    fvx_pos.y = fvy_pos.y * cos(local_space_rotation.x) - fvy_pos.z * sin(local_space_rotation.x);
+    fvx_pos.z = fvy_pos.y * sin(local_space_rotation.x) + fvy_pos.z * cos(local_space_rotation.x);
+
+    gl_Position = vec4(fvx_pos.x,fvx_pos.y,fvx_pos.z,1.0);
+    gl_PointSize = 10.0; // Set point size (e.g., 10 pixels);
     fragPos=gl_Position.xyz;
 }
