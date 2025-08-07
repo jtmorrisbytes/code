@@ -2757,6 +2757,10 @@ version = "0.1.0"
 [[package]]
 name = "libdns"
 version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "byteorder",
+]
 
 [[package]]
 name = "libgame"

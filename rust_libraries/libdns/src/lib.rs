@@ -1,6 +1,9 @@
-pub mod parsing;
+pub mod protocol;
 use std::io::{BufRead, Bytes, Cursor, Read, Write};
 use std::net::{Ipv4Addr, UdpSocket, Ipv6Addr};
+pub use anyhow::Result as LibDNSResult;
+pub use anyhow::Error as LibDNSError;
+use anyhow::Context;
 pub const DEFAULT_IO_BUFFER_BYTE_COUNT: usize = 1024;
 type IoBuffer<const SIZE: usize = DEFAULT_IO_BUFFER_BYTE_COUNT> = [u8; SIZE];
 
@@ -162,113 +165,6 @@ impl DNSHeaderFlags {
     }
 }
 
-pub struct LibDNSError {
-    inner: Box<dyn std::error::Error + Send + Sync + 'static>,
-}
-
-impl std::fmt::Display for LibDNSError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "LibDNSError: {}", self.inner)?;
-        let mut err = self.inner.source();
-        while let Some(some_err) = err {
-            writeln!(f, "because: {}", some_err)?;
-            err = some_err.source();
-        }
-        Ok(())
-    }
-}
-impl std::fmt::Debug for LibDNSError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mut b = f.debug_struct("LibDNSError");
-
-        b.field("inner", &self.inner);
-        // let err = self.inner;
-        b.finish()
-    }
-}
-
-#[derive(Debug)]
-pub struct MessageError {
-    msg: String,
-}
-
-impl MessageError {
-    pub fn new(msg: impl Into<String>) -> Self {
-        MessageError { msg: msg.into() }
-    }
-}
-
-impl std::fmt::Display for MessageError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.msg)
-    }
-}
-
-impl std::error::Error for MessageError {}
-
-macro_rules! msg {
-    ($msg:expr) => {
-        LibDNSError {
-            inner: Box::new(MessageError::new($msg)),
-        }
-    };
-}
-
-pub struct ContextError {
-    msg: String,
-    source: Box<dyn std::error::Error + Send + Sync + 'static>,
-}
-impl std::fmt::Display for ContextError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "context: {}", self.msg)
-    }
-}
-impl std::fmt::Debug for ContextError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("ContextError")
-            .field("msg", &self.msg)
-            .field("inner", &self.source)
-            .finish()
-    }
-}
-impl std::error::Error for ContextError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        Some(&*self.source)
-    }
-}
-pub type LibDNSResult<T> = std::result::Result<T, self::LibDNSError>;
-
-impl std::convert::From<ContextError> for LibDNSError {
-    fn from(error: ContextError) -> Self {
-        Self {
-            inner: Box::new(error),
-        }
-    }
-}
-pub trait LibDNSErrorContext<T> {
-    fn context(self, msg: String) -> self::LibDNSResult<T>;
-}
-impl<T, E> LibDNSErrorContext<T> for std::result::Result<T, E>
-where
-    E: std::error::Error + Send + Sync + 'static,
-{
-    fn context(self, msg: String) -> self::LibDNSResult<T> {
-        self.map_err(|e| {
-            let wrapped = ContextError {
-                msg,
-                source: Box::new(e),
-            };
-            LibDNSError::from(wrapped)
-        })
-    }
-}
-
-impl std::error::Error for self::LibDNSError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        self.inner.source()
-    }
-}
-
 // ===== Constants =====
 pub const OPCODE_A: u16 = 0;
 
@@ -402,14 +298,14 @@ impl QName {
 
     pub fn try_from_fdqn(s: &str) -> LibDNSResult<Self> {
         if s.len() == 0 {
-            return Err(msg!("A zero size string is not a valid FDQN"));
+            return Err(anyhow::Error::msg("A zero size string is not a valid FDQN"));
         }
         if s == "." {
             return Ok(Self(vec![0]));
         }
         if !s.ends_with(".") {
             // FDQNS must start end with a .
-            return Err(msg!("A valid FDQN must end with a '.'"));
+            return Err(anyhow::Error::msg("A valid FDQN must end with a '.'"));
         }
         let mut qname = vec![];
         // this is the root domain
@@ -419,7 +315,7 @@ impl QName {
             if character == '.' {
                 if label.len() > 63 {
                     // label too long
-                    return Err(msg!(format!(
+                    return Err(anyhow::Error::msg(format!(
                         "the label {label:?} is too long. Max len is 63 chars"
                     )));
                 }
@@ -468,7 +364,7 @@ impl<T>  TryFromCursor<T> for QName where T: AsRef<[u8]> {
         loop {
             let size = read_u8_from_cursor(cursor)?;
             if size > 63 {
-                return Err(msg!(format!("Invalid size for qname label: {size}")))
+                return Err(anyhow::Error::msg(format!("Invalid size for qname label: {size}")))
             }
             println!("size: {size}");
             if size == 0 {
@@ -485,7 +381,7 @@ impl<T>  TryFromCursor<T> for QName where T: AsRef<[u8]> {
         }
 
         if buf.len() > 255 {
-            return Err(msg!(format!("Buffer too large for QName. max size 255 {}",buf.len())))
+            return Err(anyhow::Error::msg(format!("Buffer too large for QName. max size 255 {}",buf.len())))
         }
 
         Ok(Self(buf))
@@ -790,7 +686,7 @@ impl std::convert::TryFrom<u16> for QType {
             28 => Ok(Self::AAAA),
             33 => Ok(Self::SRV),
             255 => Ok(Self::Any),
-            _ => Err(msg!(format!(
+            _ => Err(anyhow::Error::msg(format!(
                 "The u16 value {value} is not valid for type QType"
             ))),
         }
@@ -823,7 +719,7 @@ impl std::convert::TryFrom<&[u8]> for QType {
 impl std::convert::TryFrom<Vec<u8>> for QType {
     type Error = LibDNSError;
     fn try_from(value: Vec<u8>) -> Result<Self, Self::Error> {
-        let bytes = value.get(0..2).ok_or(msg!(
+        let bytes = value.get(0..2).ok_or(anyhow::Error::msg(
             "QType TryFrom<Vec<u8>> Failed to get 2 bytes for u16 converson"
         ))?;
         let n = u16::from_be_bytes(
@@ -937,7 +833,7 @@ pub fn dns_resolve_hostname(
     name: &str,
 ) -> LibDNSResult<DNSResponse> {
     if !hostname_is_valid(name) {
-        return Err(msg!(format!(
+        return Err(anyhow::Error::msg(format!(
             "The string input '{name}' is not a valid hostname"
         )));
     }
@@ -1003,7 +899,7 @@ pub fn dns_resolve_hostname(
 
     // we probably still want to parse the rest of the information we have and return an empty response here
     if header.get_rcode() != RCode::NoError {
-        return Err(msg!(format!(
+        return Err(anyhow::Error::msg(format!(
             "The dns server returned the response code {:?}",
             header.get_rcode()
         )));
