@@ -1,106 +1,3 @@
-// use rocket::time as time;
-use bigdecimal::BigDecimal;
-#[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
-use proc_macros::IntoTemplate;
-use std::default;
-
-use super::authorization::AccessTokenRequestError;
-
-// #[cfg(not(all(target_arch="wasm32",target_os="unknown")))]
-// #[rocket::async_trait]
-// impl<'r> rocket::request::FromRequest<'r> for User {
-//     type Error = anyhow::Error;
-//     async fn from_request(
-//         _request: &'r rocket::request::Request<'_>,
-//     ) -> rocket::request::Outcome<Self, Self::Error> {
-//         todo!("From request for user")
-//     }
-// }
-
-pub struct AccessTokenUser(pub(crate) super::db::user::User);
-impl std::ops::Deref for AccessTokenUser {
-    type Target = super::db::user::User;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-#[derive(serde::Serialize, thiserror::Error, Debug)]
-#[error("AcessTokenUserError: {0}")]
-pub struct AccessTokenUserError(String);
-
-impl std::convert::From<AccessTokenRequestError> for AccessTokenUserError {
-    fn from(value: AccessTokenRequestError) -> Self {
-        Self(value.to_string())
-    }
-}
-impl std::convert::From<String> for AccessTokenUserError {
-    fn from(s: String) -> Self {
-        Self(s)
-    }
-}
-
-pub struct AccessTokenUserId(pub uuid::Uuid);
-impl std::ops::Deref for AccessTokenUserId {
-    type Target = uuid::Uuid;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-impl AsRef<uuid::Uuid> for AccessTokenUserId {
-    fn as_ref(&self) -> &uuid::Uuid {
-        &self.0
-    }
-}
-
-#[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
-impl std::convert::From<AccessTokenUserError> for super::response::HtmlResponse {
-    fn from(value: AccessTokenUserError) -> super::response::HtmlResponse {
-        let context = super::response::UnauthorizedError {
-            error: value.to_string(),
-            return_uri: rocket::uri!(super::authorization::authorize(
-                Option::<String>::None,
-                Option::<String>::None
-            ))
-            .to_string(),
-        };
-        super::response::HtmlResponse::unauthorized(context)
-    }
-}
-
-#[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
-#[rocket::async_trait]
-impl<'r> rocket::request::FromRequest<'r> for AccessTokenUser {
-    type Error = AccessTokenUserError;
-    async fn from_request(
-        request: &'r rocket::request::Request<'_>,
-    ) -> rocket::request::Outcome<Self, Self::Error> {
-        use super::authorization::AccessToken;
-        // use super::user::User;
-        use super::db::PrimaryDatabasePoolConnection;
-        let access_token = match request.guard::<AccessToken>().await {
-            rocket::request::Outcome::Success(a_t) => a_t,
-            rocket::request::Outcome::Error((_status, error)) => {
-                return rocket::request::Outcome::Error((
-                    rocket::http::Status::Unauthorized,
-                    error.into(),
-                ))
-            }
-            rocket::request::Outcome::Forward(_) => unimplemented!(),
-        };
-        let mut connection = request
-            .guard::<PrimaryDatabasePoolConnection>()
-            .await
-            .unwrap();
-        let auth0_user_id = access_token.claims().sub.clone();
-        let fetch_user_result =
-            super::db::user::User::get_from_auth0_user_id(&mut connection, &auth0_user_id).await;
-        match fetch_user_result {
-            Ok(user) => rocket::request::Outcome::Success(Self(user)),
-            // Ok(None) => rocket::request::Outcome::Error((rocket::http::Status::NotFound,format!("AccessTokenUser request guard: user with auth0_user_id {} not found",access_token.claims().sub).into())),
-            Err(error) => rocket::request::Outcome::Error((rocket::http::Status::InternalServerError,error.context("Access token user request guard: while trying to get a user from thier access token").to_string().into())),
-        }
-    }
-}
 
 #[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
 #[rocket::async_trait]
@@ -143,55 +40,99 @@ impl<'r> rocket::request::FromRequest<'r> for AccessTokenUserId {
     }
 }
 
-pub struct UserProfile {}
+#[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
+#[rocket::async_trait]
+impl<'r> rocket::request::FromRequest<'r> for AccessTokenUser {
+    type Error = AccessTokenUserError;
+    async fn from_request(
+        request: &'r rocket::request::Request<'_>,
+    ) -> rocket::request::Outcome<Self, Self::Error> {
+        use super::authorization::AccessToken;
+        // use super::user::User;
+        use super::db::PrimaryDatabasePoolConnection;
+        let access_token = match request.guard::<AccessToken>().await {
+            rocket::request::Outcome::Success(a_t) => a_t,
+            rocket::request::Outcome::Error((_status, error)) => {
+                return rocket::request::Outcome::Error((
+                    rocket::http::Status::Unauthorized,
+                    error.into(),
+                ))
+            }
+            rocket::request::Outcome::Forward(_) => unimplemented!(),
+        };
+        let mut connection = request
+            .guard::<PrimaryDatabasePoolConnection>()
+            .await
+            .unwrap();
+        let auth0_user_id = access_token.claims().sub.clone();
+        let fetch_user_result =
+            super::db::user::User::get_from_auth0_user_id(&mut connection, &auth0_user_id).await;
+        match fetch_user_result {
+            Ok(user) => rocket::request::Outcome::Success(Self(user)),
+            // Ok(None) => rocket::request::Outcome::Error((rocket::http::Status::NotFound,format!("AccessTokenUser request guard: user with auth0_user_id {} not found",access_token.claims().sub).into())),
+            Err(error) => rocket::request::Outcome::Error((rocket::http::Status::InternalServerError,error.context("Access token user request guard: while trying to get a user from thier access token").to_string().into())),
+        }
+    }
+}
+#[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
+impl<T, E> std::convert::From<Result<T, E>> for GetUsernameResponse<T, E> {
+    fn from(value: Result<T, E>) -> Self {
+        match value {
+            Ok(t) => Self::Ok(rocket::serde::msgpack::MsgPack(t)),
+            Err(e) => Self::Err(rocket::serde::msgpack::MsgPack(e)),
+        }
+    }
+}
+impl AsRef<uuid::Uuid> for AccessTokenUserId {
+    fn as_ref(&self) -> &uuid::Uuid {
+        &self.0
+    }
+}
 
-// use crate::authentication::SCOPE_READ_OTHERS_DATA;
-#[cfg_attr(
-    not(all(target_arch = "wasm32", target_os = "unknown")),
-    derive(IntoTemplate)
-)]
-#[derive(serde::Serialize)]
-pub struct UserSettings {
-    dashboard_url: String,
-    settings_url: String,
+impl std::convert::From<AccessTokenRequestError> for AccessTokenUserError {
+    fn from(value: AccessTokenRequestError) -> Self {
+        Self(value.to_string())
+    }
 }
 
 #[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
-#[rocket::get("/user/settings.html", format = "text/html")]
-pub async fn render_user_settings_template(
-    #[allow(unused)] public_base_uri: super::RocketAbsoluteBaseUri,
-    access_token_user: super::user::AccessTokenUser,
-    // server_config: &rocket::State<crate::ServerConfig>,
-    // connection: crate::PrimaryDatabaseConnection,
-) -> super::response::HtmlResult {
-    let _ = access_token_user;
-    // let index_uri= rocket::uri!((*public_base_uri).to_owned(),crate::render_index());
-    let dashboard_url = rocket::uri!(
-        (*public_base_uri).to_owned(),
-        render_user_dashboard_template()
-    );
-    let settings_url = rocket::uri!(
-        (*public_base_uri).to_owned(),
-        render_user_settings_template()
-    );
-    Ok(super::response::HtmlResponse::success_into_template(
-        UserSettings {
-            dashboard_url: dashboard_url.to_string(),
-            settings_url: settings_url.to_string(),
-        },
-    ))
+impl std::convert::From<AccessTokenUserError> for super::response::HtmlResponse {
+    fn from(value: AccessTokenUserError) -> super::response::HtmlResponse {
+        let context = super::response::UnauthorizedError {
+            error: value.to_string(),
+            return_uri: rocket::uri!(super::authorization::authorize(
+                Option::<String>::None,
+                Option::<String>::None
+            ))
+            .to_string(),
+        };
+        super::response::HtmlResponse::unauthorized(context)
+    }
 }
-
-#[rocket::get("/user/transactions.html", format = "text/html")]
-pub fn render_user_transactions_template(#[allow(unused)] access_token_user: AccessTokenUser) {}
-
-#[derive(serde::Serialize, IntoTemplate)]
-pub struct UserDashboardContext {
-    pub settings_url: String,
-    pub dashboard_url: String,
-    pub transactions_upload_url: String,
-    pub all_time_expenses: BigDecimal,
-    pub all_time_income: BigDecimal,
+impl std::convert::From<String> for AccessTokenUserError {
+    fn from(s: String) -> Self {
+        Self(s)
+    }
+}
+impl std::ops::Deref for AccessTokenUserId {
+    type Target = uuid::Uuid;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+impl std::ops::Deref for AccessTokenUser {
+    type Target = super::db::user::User;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+#[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
+#[rocket::get("/user/transactions/upload", format = "text/html")]
+pub async fn render_transactions_upload_template() -> super::response::HtmlResult {
+    let context = UserTransactionsUploadTemplateContext::default();
+    Ok(super::response::HtmlResponse::success_into_template(
+        context,
+    ))
 }
 #[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
 #[rocket::get("/user/dashboard.html", format = "text/html")]
@@ -263,38 +204,30 @@ pub async fn render_user_dashboard_template(
         all_time_income,
     }))
 }
-#[rocket::get("/user/tools/paycheck-estimator.html")]
-pub fn render_user_paycheck_estimator() {}
 
-// create a function that allows a user to upload transactions from a file
-// I want to allow multipart file uploads of an unlimited amount and size.
-// #[derive(FromForm,Debug)]
-// pub struct CsvFileUpload {
-//     name:String,
-//     file:String
-// }
-// #[derive(Debug)]
-// pub struct Multipart{}
-// #[rocket::async_trait]
-// impl<'r> rocket::data::FromData<'r> for Multipart {
-//     type Error = anyhow::Error;
-//     fn from_data(request: &'r rocket::request::Request<'_>,data: rocket::Data<'r>) -> rocket::data::Outcome<'r,Self,Self::Error> {
-
-//         rocket::data::Outcome::Success(Self{})
-//     }
-// }
-#[derive(serde::Serialize, default::Default, IntoTemplate)]
-pub struct UserTransactionsUploadTemplateContext {
-    database_errors: Vec<String>,
-    parse_errors: Vec<String>,
-    successfully_uploaded: usize,
-}
 #[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
-#[rocket::get("/user/transactions/upload", format = "text/html")]
-pub async fn render_transactions_upload_template() -> super::response::HtmlResult {
-    let context = UserTransactionsUploadTemplateContext::default();
+#[rocket::get("/user/settings.html", format = "text/html")]
+pub async fn render_user_settings_template(
+    #[allow(unused)] public_base_uri: super::RocketAbsoluteBaseUri,
+    access_token_user: super::user::AccessTokenUser,
+    // server_config: &rocket::State<crate::ServerConfig>,
+    // connection: crate::PrimaryDatabaseConnection,
+) -> super::response::HtmlResult {
+    let _ = access_token_user;
+    // let index_uri= rocket::uri!((*public_base_uri).to_owned(),crate::render_index());
+    let dashboard_url = rocket::uri!(
+        (*public_base_uri).to_owned(),
+        render_user_dashboard_template()
+    );
+    let settings_url = rocket::uri!(
+        (*public_base_uri).to_owned(),
+        render_user_settings_template()
+    );
     Ok(super::response::HtmlResponse::success_into_template(
-        context,
+        UserSettings {
+            dashboard_url: dashboard_url.to_string(),
+            settings_url: settings_url.to_string(),
+        },
     ))
 }
 #[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
@@ -363,12 +296,79 @@ pub enum GetUsernameResponse<T, E> {
     #[response(status = 400)]
     NotFound(()),
 }
-#[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
-impl<T, E> std::convert::From<Result<T, E>> for GetUsernameResponse<T, E> {
-    fn from(value: Result<T, E>) -> Self {
-        match value {
-            Ok(t) => Self::Ok(rocket::serde::msgpack::MsgPack(t)),
-            Err(e) => Self::Err(rocket::serde::msgpack::MsgPack(e)),
-        }
-    }
+#[rocket::get("/user/tools/paycheck-estimator.html")]
+pub fn render_user_paycheck_estimator() {}
+
+#[rocket::get("/user/transactions.html", format = "text/html")]
+pub fn render_user_transactions_template(#[allow(unused)] access_token_user: AccessTokenUser) {}
+
+// #[cfg(not(all(target_arch="wasm32",target_os="unknown")))]
+// #[rocket::async_trait]
+// impl<'r> rocket::request::FromRequest<'r> for User {
+//     type Error = anyhow::Error;
+//     async fn from_request(
+//         _request: &'r rocket::request::Request<'_>,
+//     ) -> rocket::request::Outcome<Self, Self::Error> {
+//         todo!("From request for user")
+//     }
+// }
+
+pub struct AccessTokenUser(pub(crate) super::db::user::User);
+#[derive(serde::Serialize, thiserror::Error, Debug)]
+#[error("AcessTokenUserError: {0}")]
+pub struct AccessTokenUserError(String);
+
+pub struct AccessTokenUserId(pub uuid::Uuid);
+
+#[derive(serde::Serialize, IntoTemplate)]
+pub struct UserDashboardContext {
+    pub settings_url: String,
+    pub dashboard_url: String,
+    pub transactions_upload_url: String,
+    pub all_time_expenses: BigDecimal,
+    pub all_time_income: BigDecimal,
 }
+
+pub struct UserProfile {}
+
+// use crate::authentication::SCOPE_READ_OTHERS_DATA;
+#[cfg_attr(
+    not(all(target_arch = "wasm32", target_os = "unknown")),
+    derive(IntoTemplate)
+)]
+#[derive(serde::Serialize)]
+pub struct UserSettings {
+    dashboard_url: String,
+    settings_url: String,
+}
+
+// create a function that allows a user to upload transactions from a file
+// I want to allow multipart file uploads of an unlimited amount and size.
+// #[derive(FromForm,Debug)]
+// pub struct CsvFileUpload {
+//     name:String,
+//     file:String
+// }
+// #[derive(Debug)]
+// pub struct Multipart{}
+// #[rocket::async_trait]
+// impl<'r> rocket::data::FromData<'r> for Multipart {
+//     type Error = anyhow::Error;
+//     fn from_data(request: &'r rocket::request::Request<'_>,data: rocket::Data<'r>) -> rocket::data::Outcome<'r,Self,Self::Error> {
+
+//         rocket::data::Outcome::Success(Self{})
+//     }
+// }
+#[derive(serde::Serialize, default::Default, IntoTemplate)]
+pub struct UserTransactionsUploadTemplateContext {
+    database_errors: Vec<String>,
+    parse_errors: Vec<String>,
+    successfully_uploaded: usize,
+}
+// use rocket::time as time;
+use bigdecimal::BigDecimal;
+#[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
+use proc_macros::IntoTemplate;
+use std::default;
+
+use super::authorization::AccessTokenRequestError;

@@ -1,40 +1,38 @@
-use byteorder::{BigEndian, ReadBytesExt};
-use std::io::{Read, Seek};
-use std::net::Ipv4Addr;
-use std::ops::{BitAnd, BitAndAssign, Shr};
+    + size_of::<ANCount>()
+    + size_of::<ARCount>();
+    + size_of::<HeaderFlags>()
+    + size_of::<NSCount>()
+    + size_of::<QDCount>()
+const AA_BITFLAG: u16 = 0b0000010000000000;
+const AD_BITFLAG: u16 = 0b0000000000100000;
+const BOOLEAN_BITFLAG: u16 = 0b0000000000000001;
+const BYTE_COUNT_OF_HEADER: usize = BYTE_LENTH_OF_HEADER / size_of::<u8>();
+const BYTE_COUNT_OF_U128: usize = size_of::<u128>() / size_of::<u8>();
 
-use anyhow::{Context, Error, Result};
-use std::mem::size_of;
+#[allow(non_upper_case_globals)]
+const BYTE_COUNT_OF_U16: usize = size_of::<u16>() / size_of::<u8>();
+const BYTE_COUNT_OF_U32: usize = size_of::<u32>() / size_of::<u8>();
+const BYTE_LENTH_OF_HEADER: usize = size_of::<HeaderID>()
+const CD_BITFLAG: u16 = 0b0000000000010000;
+const OPCODE_BITFLAG: u16 = 0b0111100000000000;
 
-// create a function that is general over any container: slice, array, or vector of bytes
-// that reads exactly N bytes from the container
-
-pub struct DNSHeaderFlags(u16);
-
-type HeaderID = u16;
-#[repr(transparent)]
-#[derive(PartialEq, Clone, Copy)]
-pub struct HeaderFlags(u16);
-impl BitAnd<u16> for HeaderFlags {
-    type Output = Self;
-    fn bitand(self, rhs: u16) -> Self::Output {
-        Self(self.0 & rhs)
-    }
-}
+// Bit order for flags left -> right
+const QR_BITFLAG: u16 = 0b1000000000000000;
+const RA_BITFLAG: u16 = 0b0000000010000000;
+const RCODE_BITFLAG: u16 = 0b0000000000001111;
+const RD_BITFLAG: u16 = 0b0000000100000000;
+const TC_BITFLAG: u16 = 0b0000001000000000;
+const Z_BITFLAG: u16 = 0b0000000001000000;
 impl BitAnd<&u16> for HeaderFlags {
     type Output = Self;
     fn bitand(self, rhs: &u16) -> Self::Output {
         Self(self.0 & rhs)
     }
 }
-impl BitAndAssign<u16> for HeaderFlags {
-    fn bitand_assign(&mut self, rhs: u16) {
-        self.0 |= rhs
-    }
-}
-impl BitAndAssign<Self> for HeaderFlags {
-    fn bitand_assign(&mut self, rhs: Self) {
-        self.0 |= rhs.0
+impl BitAnd<u16> for HeaderFlags {
+    type Output = Self;
+    fn bitand(self, rhs: u16) -> Self::Output {
+        Self(self.0 & rhs)
     }
 }
 impl BitAndAssign<&mut Self> for HeaderFlags {
@@ -42,10 +40,14 @@ impl BitAndAssign<&mut Self> for HeaderFlags {
         self.0 |= rhs.0
     }
 }
-impl Shr<u16> for HeaderFlags {
-    type Output = Self;
-    fn shr(self, rhs: u16) -> Self::Output {
-        Self(self.0 >> rhs)
+impl BitAndAssign<Self> for HeaderFlags {
+    fn bitand_assign(&mut self, rhs: Self) {
+        self.0 |= rhs.0
+    }
+}
+impl BitAndAssign<u16> for HeaderFlags {
+    fn bitand_assign(&mut self, rhs: u16) {
+        self.0 |= rhs
     }
 }
 impl PartialEq<u16> for HeaderFlags {
@@ -56,204 +58,6 @@ impl PartialEq<u16> for HeaderFlags {
         &self.0 != other
     }
 }
-
-type QDCount = u16;
-type ANCount = u16;
-type NSCount = u16;
-type ARCount = u16;
-type RCode = u16;
-
-// ===== Constants =====
-pub const OPCODE_A: u16 = 0;
-
-// Bit order for flags left -> right
-const QR_BITFLAG: u16 = 0b1000000000000000;
-const OPCODE_BITFLAG: u16 = 0b0111100000000000;
-const AA_BITFLAG: u16 = 0b0000010000000000;
-const TC_BITFLAG: u16 = 0b0000001000000000;
-const RD_BITFLAG: u16 = 0b0000000100000000;
-const RA_BITFLAG: u16 = 0b0000000010000000;
-const Z_BITFLAG: u16 = 0b0000000001000000;
-const AD_BITFLAG: u16 = 0b0000000000100000;
-const CD_BITFLAG: u16 = 0b0000000000010000;
-const RCODE_BITFLAG: u16 = 0b0000000000001111;
-const BOOLEAN_BITFLAG: u16 = 0b0000000000000001;
-
-pub fn get_qr(f: &HeaderFlags) -> bool {
-    ((*f & QR_BITFLAG) >> 15) != 0
-}
-pub fn get_opcode(f: &HeaderFlags) -> u16 {
-    ((*f & OPCODE_BITFLAG) >> 11).0
-}
-pub fn get_authoritative_answer(f: &HeaderFlags) -> bool {
-    ((*f & AA_BITFLAG) >> 10) != 0
-}
-
-pub fn get_truncated(f: &HeaderFlags) -> bool {
-    ((*f & TC_BITFLAG) >> 9) != 0
-}
-pub fn get_recursion_desired(f: &HeaderFlags) -> bool {
-    ((*f & RD_BITFLAG) >> 8) != 0
-}
-pub fn get_recursion_available(f: &HeaderFlags) -> bool {
-    ((*f & RA_BITFLAG) >> 7) != 0
-}
-pub fn get_z(f: &HeaderFlags) -> bool {
-    ((*f & Z_BITFLAG) >> 6) != 0
-}
-pub fn get_ad(f: &HeaderFlags) -> bool {
-    (*f & AD_BITFLAG) >> 5 != 0
-}
-pub fn get_cd(f: &HeaderFlags) -> bool {
-    ((*f & CD_BITFLAG) >> 4) != 0
-}
-pub fn get_rcode(f: &HeaderFlags) -> RCode {
-    (*f & RCODE_BITFLAG).0
-}
-
-pub fn set_query_response(f: &mut HeaderFlags, b: bool) {
-    f.0 |= ((b as u16) << 15);
-}
-pub fn set_opcode(f: &mut HeaderFlags, n: u16) {
-    f.0 |= (n & 0b000000000000001111) << 14;
-}
-pub fn set_recursion_desired(f: &mut HeaderFlags, b: bool) {
-    f.0 |= (b as u16 & BOOLEAN_BITFLAG) << 8;
-}
-
-#[allow(non_upper_case_globals)]
-const BYTE_COUNT_OF_U16: usize = size_of::<u16>() / size_of::<u8>();
-const BYTE_COUNT_OF_U32: usize = size_of::<u32>() / size_of::<u8>();
-const BYTE_COUNT_OF_U128: usize = size_of::<u128>() / size_of::<u8>();
-const BYTE_LENTH_OF_HEADER: usize = size_of::<HeaderID>()
-    + size_of::<HeaderFlags>()
-    + size_of::<QDCount>()
-    + size_of::<ANCount>()
-    + size_of::<NSCount>()
-    + size_of::<ARCount>();
-const BYTE_COUNT_OF_HEADER: usize = BYTE_LENTH_OF_HEADER / size_of::<u8>();
-
-pub fn read_byte<Reader: Read>(reader: &mut Reader) -> anyhow::Result<u8> {
-    let mut buf = [0_u8];
-    let bytes_written = reader
-        .read(&mut buf)
-        .context("Failed to read a byte from the reader".to_string())?;
-    if bytes_written < buf.len() {
-        return Err(anyhow::Error::msg(
-            "Not all of the required data was read from the reader",
-        ));
-    }
-    return Ok(buf[0]);
-}
-pub fn read_u16_be<Reader: Read>(reader: &mut Reader) -> anyhow::Result<u16> {
-    let mut buf = [0_u8, 0_u8];
-    reader.read_exact(&mut buf).context(format!(
-        "Failed to read {} bytes from the reader",
-        buf.len()
-    ))?;
-
-    let n: u16 = u16::from_be_bytes(buf);
-    return Ok(n);
-}
-pub fn read_u32_be<Reader: Read>(reader: &mut Reader) -> anyhow::Result<u32> {
-    let mut buf = [0_u8; 4];
-    reader.read_exact(&mut buf).context(format!(
-        "Failed to read {} bytes from the reader",
-        buf.len()
-    ))?;
-    let n: u32 = u32::from_be_bytes(buf);
-    return Ok(n);
-}
-
-pub fn read_128_be<Reader: Read>(reader: &mut Reader) -> anyhow::Result<u128> {
-    let mut buf = [0_u8; 16];
-    reader.read_exact(&mut buf).context(format!(
-        "Failed to read {} bytes from the reader",
-        buf.len()
-    ))?;
-    let n: u128 = u128::from_be_bytes(buf);
-    return Ok(n);
-}
-
-pub fn read_bytes<Reader: Read>(size: usize, reader: &mut Reader) -> anyhow::Result<Vec<u8>> {
-    let mut buffer = vec![0_u8; size];
-    reader
-        .read_exact(&mut buffer)
-        .context(format!("failed to read {} bytes", size))?;
-    Ok(buffer)
-}
-
-pub fn read_qname<Reader: Read + Seek>(reader: &mut Reader) -> anyhow::Result<QName> {
-    let current_position = reader
-        .seek(std::io::SeekFrom::Current(0))
-        .context("Failed SeekFrom::Current(0)".to_string())?;
-    let byte = read_byte(reader)?;
-
-    let mut name: Vec<u8> = vec![];
-    if byte & 0b11000000 == 0b11000000 {
-        println!("compressed pointer");
-        let next = read_byte(reader)?;
-        let offset = (((byte & 0x3F) as u16) << 8) | (next as u16);
-        println!("offset: {offset:016b}");
-        reader
-            .seek(std::io::SeekFrom::Start(offset as u64))
-            .context(
-                "Failed to set the current position to the start of the pointed name".to_string(),
-            )?;
-    } else {
-        reader
-            .seek(std::io::SeekFrom::Start(current_position))
-            .context("Failed to seek to the start position".to_string())?;
-    }
-    loop {
-        let size = read_byte(reader)?;
-        name.push(size);
-        if size == 0 {
-            break;
-        }
-        if size > 63 {
-            return Err(anyhow::Error::msg(format!("Invalid label length {size}")));
-        }
-        if name.len() > 253 {
-            return Err(anyhow::Error::msg(format!(
-                "The whole name is too large. Max Len is 253: current len is {}",
-                name.len()
-            )));
-        }
-        let mut bytes = read_bytes(size as usize, reader)?;
-        name.append(&mut bytes);
-    }
-    if byte & 0xC0 == 0xC0 {
-        println!("compressed pointer. restoring buffer");
-        reader
-            .seek(std::io::SeekFrom::Start(current_position + 2))
-            .context("Failed to seek start + 2 when handling name pointers".to_string())?;
-    }
-    Ok(QName(name))
-}
-pub fn read_txt_record_from_buffer<Buffer: AsRef<[u8]>>(buffer: Buffer) -> anyhow::Result<String> {
-    let slice = buffer.as_ref();
-    if slice.len() < 2 {
-        return Err(anyhow::Error::msg("Invalid TXT Record."));
-    }
-    let size = slice.first().unwrap();
-    if *size as usize > slice.len() {
-        return Err(anyhow::Error::msg(
-            "Invalid size byte or buffer is not large enough",
-        ));
-    }
-    println!("txt size {size}");
-    let slice = slice
-        .get(1..=(*size + 1) as usize)
-        .ok_or(anyhow::Error::msg("Range not valid"))?;
-    Ok(str::from_utf8(slice)
-        .context(
-            "Failed to get a string slice from a raw slice while extracting txt record".to_string(),
-        )?
-        .to_string())
-}
-// name for question. DOES NOT respect pointers
-pub struct QName(Vec<u8>);
 impl QName {
     pub fn to_string(&self) -> anyhow::Result<String> {
         let mut output = String::new();
@@ -303,21 +107,15 @@ impl QName {
         Ok(Self(name))
     }
 }
-
-pub struct QClass;
-
-// question type
-pub struct QType;
-// name for responses. DOES respect pointers
-
-pub struct DNSQuestion {
-    name: QName,
-    r#type: QType,
-    r#class: QClass,
+impl Shr<u16> for HeaderFlags {
+    type Output = Self;
+    fn shr(self, rhs: u16) -> Self::Output {
+        Self(self.0 >> rhs)
+    }
 }
-pub struct RName;
-pub struct RType;
-pub struct RClass;
+
+// ===== Constants =====
+pub const OPCODE_A: u16 = 0;
 pub enum RData {
     A(std::net::Ipv4Addr),
     AAAA(std::net::Ipv6Addr),
@@ -325,25 +123,37 @@ pub enum RData {
     TXT(()),
     Other(Vec<u8>),
 }
-pub struct DNSAnswer {
-    name: RName,
-    r#type: RType,
-    class: RClass,
-    rdata: RData,
+pub fn get_ad(f: &HeaderFlags) -> bool {
+    (*f & AD_BITFLAG) >> 5 != 0
 }
-pub struct DNSPacket {
-    id: HeaderID,
-    flags: HeaderFlags,
+pub fn get_authoritative_answer(f: &HeaderFlags) -> bool {
+    ((*f & AA_BITFLAG) >> 10) != 0
+}
+pub fn get_cd(f: &HeaderFlags) -> bool {
+    ((*f & CD_BITFLAG) >> 4) != 0
+}
+pub fn get_opcode(f: &HeaderFlags) -> u16 {
+    ((*f & OPCODE_BITFLAG) >> 11).0
+}
 
-    qdcount: QDCount,
-    ancount: ANCount,
-    nscount: NSCount,
-    arcount: ARCount,
+pub fn get_qr(f: &HeaderFlags) -> bool {
+    ((*f & QR_BITFLAG) >> 15) != 0
+}
+pub fn get_rcode(f: &HeaderFlags) -> RCode {
+    (*f & RCODE_BITFLAG).0
+}
+pub fn get_recursion_available(f: &HeaderFlags) -> bool {
+    ((*f & RA_BITFLAG) >> 7) != 0
+}
+pub fn get_recursion_desired(f: &HeaderFlags) -> bool {
+    ((*f & RD_BITFLAG) >> 8) != 0
+}
 
-    questions: Vec<DNSQuestion>,
-    answers: Vec<()>,
-    nameservers: Vec<()>,
-    authoriative_responses: Vec<()>,
+pub fn get_truncated(f: &HeaderFlags) -> bool {
+    ((*f & TC_BITFLAG) >> 9) != 0
+}
+pub fn get_z(f: &HeaderFlags) -> bool {
+    ((*f & Z_BITFLAG) >> 6) != 0
 }
 
 // we are trying parsing again from scratch because we are having trouble with aligment.
@@ -437,6 +247,136 @@ pub fn parse_raw_dns_response_packet<Packet: AsRef<[u8]>>(packet: Packet) -> any
     Ok(())
 }
 
+pub fn read_128_be<Reader: Read>(reader: &mut Reader) -> anyhow::Result<u128> {
+    let mut buf = [0_u8; 16];
+    reader.read_exact(&mut buf).context(format!(
+        "Failed to read {} bytes from the reader",
+        buf.len()
+    ))?;
+    let n: u128 = u128::from_be_bytes(buf);
+    return Ok(n);
+}
+
+pub fn read_byte<Reader: Read>(reader: &mut Reader) -> anyhow::Result<u8> {
+    let mut buf = [0_u8];
+    let bytes_written = reader
+        .read(&mut buf)
+        .context("Failed to read a byte from the reader".to_string())?;
+    if bytes_written < buf.len() {
+        return Err(anyhow::Error::msg(
+            "Not all of the required data was read from the reader",
+        ));
+    }
+    return Ok(buf[0]);
+}
+
+pub fn read_bytes<Reader: Read>(size: usize, reader: &mut Reader) -> anyhow::Result<Vec<u8>> {
+    let mut buffer = vec![0_u8; size];
+    reader
+        .read_exact(&mut buffer)
+        .context(format!("failed to read {} bytes", size))?;
+    Ok(buffer)
+}
+
+pub fn read_qname<Reader: Read + Seek>(reader: &mut Reader) -> anyhow::Result<QName> {
+    let current_position = reader
+        .seek(std::io::SeekFrom::Current(0))
+        .context("Failed SeekFrom::Current(0)".to_string())?;
+    let byte = read_byte(reader)?;
+
+    let mut name: Vec<u8> = vec![];
+    if byte & 0b11000000 == 0b11000000 {
+        println!("compressed pointer");
+        let next = read_byte(reader)?;
+        let offset = (((byte & 0x3F) as u16) << 8) | (next as u16);
+        println!("offset: {offset:016b}");
+        reader
+            .seek(std::io::SeekFrom::Start(offset as u64))
+            .context(
+                "Failed to set the current position to the start of the pointed name".to_string(),
+            )?;
+    } else {
+        reader
+            .seek(std::io::SeekFrom::Start(current_position))
+            .context("Failed to seek to the start position".to_string())?;
+    }
+    loop {
+        let size = read_byte(reader)?;
+        name.push(size);
+        if size == 0 {
+            break;
+        }
+        if size > 63 {
+            return Err(anyhow::Error::msg(format!("Invalid label length {size}")));
+        }
+        if name.len() > 253 {
+            return Err(anyhow::Error::msg(format!(
+                "The whole name is too large. Max Len is 253: current len is {}",
+                name.len()
+            )));
+        }
+        let mut bytes = read_bytes(size as usize, reader)?;
+        name.append(&mut bytes);
+    }
+    if byte & 0xC0 == 0xC0 {
+        println!("compressed pointer. restoring buffer");
+        reader
+            .seek(std::io::SeekFrom::Start(current_position + 2))
+            .context("Failed to seek start + 2 when handling name pointers".to_string())?;
+    }
+    Ok(QName(name))
+}
+pub fn read_txt_record_from_buffer<Buffer: AsRef<[u8]>>(buffer: Buffer) -> anyhow::Result<String> {
+    let slice = buffer.as_ref();
+    if slice.len() < 2 {
+        return Err(anyhow::Error::msg("Invalid TXT Record."));
+    }
+    let size = slice.first().unwrap();
+    if *size as usize > slice.len() {
+        return Err(anyhow::Error::msg(
+            "Invalid size byte or buffer is not large enough",
+        ));
+    }
+    println!("txt size {size}");
+    let slice = slice
+        .get(1..=(*size + 1) as usize)
+        .ok_or(anyhow::Error::msg("Range not valid"))?;
+    Ok(str::from_utf8(slice)
+        .context(
+            "Failed to get a string slice from a raw slice while extracting txt record".to_string(),
+        )?
+        .to_string())
+}
+pub fn read_u16_be<Reader: Read>(reader: &mut Reader) -> anyhow::Result<u16> {
+    let mut buf = [0_u8, 0_u8];
+    reader.read_exact(&mut buf).context(format!(
+        "Failed to read {} bytes from the reader",
+        buf.len()
+    ))?;
+
+    let n: u16 = u16::from_be_bytes(buf);
+    return Ok(n);
+}
+pub fn read_u32_be<Reader: Read>(reader: &mut Reader) -> anyhow::Result<u32> {
+    let mut buf = [0_u8; 4];
+    reader.read_exact(&mut buf).context(format!(
+        "Failed to read {} bytes from the reader",
+        buf.len()
+    ))?;
+    let n: u32 = u32::from_be_bytes(buf);
+    return Ok(n);
+}
+pub fn set_opcode(f: &mut HeaderFlags, n: u16) {
+    f.0 |= (n & 0b000000000000001111) << 14;
+}
+
+pub fn set_query_response(f: &mut HeaderFlags, b: bool) {
+    f.0 |= ((b as u16) << 15);
+}
+pub fn set_recursion_desired(f: &mut HeaderFlags, b: bool) {
+    f.0 |= (b as u16 & BOOLEAN_BITFLAG) << 8;
+}
+
 #[test]
 pub fn test_parse_raw_dns_response() {
     pub const VALID_DNS_RESPONSE_1: &[u8] = &[
@@ -498,3 +438,63 @@ pub fn test_parse_raw_dns_response() {
     let r4 = parse_raw_dns_response_packet(VALID_DNS_RESPONSE_4);
     assert!(r4.is_ok());
 }
+pub struct DNSAnswer {
+    name: RName,
+    r#type: RType,
+    class: RClass,
+    rdata: RData,
+}
+
+// create a function that is general over any container: slice, array, or vector of bytes
+// that reads exactly N bytes from the container
+
+pub struct DNSHeaderFlags(u16);
+pub struct DNSPacket {
+    id: HeaderID,
+    flags: HeaderFlags,
+
+    qdcount: QDCount,
+    ancount: ANCount,
+    nscount: NSCount,
+    arcount: ARCount,
+
+    questions: Vec<DNSQuestion>,
+    answers: Vec<()>,
+    nameservers: Vec<()>,
+    authoriative_responses: Vec<()>,
+}
+// name for responses. DOES respect pointers
+
+pub struct DNSQuestion {
+    name: QName,
+    r#type: QType,
+    r#class: QClass,
+}
+#[repr(transparent)]
+#[derive(PartialEq, Clone, Copy)]
+pub struct HeaderFlags(u16);
+
+pub struct QClass;
+// name for question. DOES NOT respect pointers
+pub struct QName(Vec<u8>);
+
+// question type
+pub struct QType;
+pub struct RClass;
+pub struct RName;
+pub struct RType;
+type ANCount = u16;
+type ARCount = u16;
+
+type HeaderID = u16;
+type NSCount = u16;
+
+type QDCount = u16;
+type RCode = u16;
+
+use anyhow::{Context, Error, Result};
+use byteorder::{BigEndian, ReadBytesExt};
+use std::io::{Read, Seek};
+use std::mem::size_of;
+use std::net::Ipv4Addr;
+use std::ops::{BitAnd, BitAndAssign, Shr};

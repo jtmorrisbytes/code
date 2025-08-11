@@ -1,61 +1,3 @@
-use garde::Validate;
-// use crate::server::db::PrimaryDatabasePool;
-#[cfg(feature = "not-wasm32-unknown-unknown")]
-use super::{schema, PgPooledConnection};
-// #[cfg(feature="not-wasm32-unknown-unknown")]
-// use diesel::query_builder::{BatchInsert, ValuesClause,InsertStatement};
-use time;
-
-#[derive(PartialEq, Eq, Clone, Debug, Validate)]
-#[cfg_attr(feature = "serialize", derive(serde::Serialize))]
-#[cfg_attr(feature = "deserialize", derive(serde::Deserialize))]
-#[cfg_attr(feature = "debug", derive(Debug))]
-#[cfg_attr(
-    feature = "not-wasm32-unknown-unknown",
-    derive(
-        diesel::Queryable,
-        diesel::Insertable,
-        diesel::AsChangeset,
-        diesel::AsExpression
-    )
-)]
-#[cfg_attr(feature="not-wasm32-unknown-unknown",diesel(table_name=super::schema::auth_state))]
-#[cfg_attr(feature="not-wasm32-unknown-unknown",diesel(sql_type=super::schema::auth_state::SqlType))]
-
-pub struct AuthState {
-    #[garde(skip)]
-    pub id: uuid::Uuid,
-    #[garde(skip)]
-    pub started: time::OffsetDateTime,
-    #[garde(skip)]
-    pub scope: String,
-    #[garde(url)]
-    pub redirect_url: String,
-    #[garde(url)]
-    pub return_url: Option<String>,
-}
-impl AuthState {
-    pub fn new(return_url: Option<&url::Url>, scope: &str, redirect_url: &url::Url) -> Self {
-        Self {
-            id: uuid::Uuid::new_v4(),
-            started: time::OffsetDateTime::now_utc(),
-            return_url: return_url.map(|u| u.to_string()),
-            scope: scope.to_string(),
-            redirect_url: redirect_url.to_string(),
-        }
-    }
-}
-
-// contains commonly reused query_fragments
-pub mod query_builder {
-    //     use crate::schema::auth_state::{table,Id};
-    //     #[diesel::dsl::auto_type]
-    //     pub fn delete_by_id(id: uuid::Uuid) -> _ {
-    //         use diesel::{QueryDsl,ExpressionMethods};
-    //         use diesel::dsl::delete as Delete;
-    //         table.delete()
-    //     }
-}
 #[cfg(feature = "not-wasm32-unknown-unknown")]
 impl AuthState {
     pub async fn insert(
@@ -178,6 +120,57 @@ impl AuthState {
             .map_err(|e| anyhow::Error::new(e))
     }
 }
+impl AuthState {
+    pub fn new(return_url: Option<&url::Url>, scope: &str, redirect_url: &url::Url) -> Self {
+        Self {
+            id: uuid::Uuid::new_v4(),
+            started: time::OffsetDateTime::now_utc(),
+            return_url: return_url.map(|u| u.to_string()),
+            scope: scope.to_string(),
+            redirect_url: redirect_url.to_string(),
+        }
+    }
+}
+
+// contains commonly reused query_fragments
+pub mod query_builder {
+    //     use crate::schema::auth_state::{table,Id};
+    //     #[diesel::dsl::auto_type]
+    //     pub fn delete_by_id(id: uuid::Uuid) -> _ {
+    //         use diesel::{QueryDsl,ExpressionMethods};
+    //         use diesel::dsl::delete as Delete;
+    //         table.delete()
+    //     }
+}
+
+#[derive(PartialEq, Eq, Clone, Debug, Validate)]
+#[cfg_attr(feature = "serialize", derive(serde::Serialize))]
+#[cfg_attr(feature = "deserialize", derive(serde::Deserialize))]
+#[cfg_attr(feature = "debug", derive(Debug))]
+#[cfg_attr(
+    feature = "not-wasm32-unknown-unknown",
+    derive(
+        diesel::Queryable,
+        diesel::Insertable,
+        diesel::AsChangeset,
+        diesel::AsExpression
+    )
+)]
+#[cfg_attr(feature="not-wasm32-unknown-unknown",diesel(table_name=super::schema::auth_state))]
+#[cfg_attr(feature="not-wasm32-unknown-unknown",diesel(sql_type=super::schema::auth_state::SqlType))]
+
+pub struct AuthState {
+    #[garde(skip)]
+    pub id: uuid::Uuid,
+    #[garde(skip)]
+    pub started: time::OffsetDateTime,
+    #[garde(skip)]
+    pub scope: String,
+    #[garde(url)]
+    pub redirect_url: String,
+    #[garde(url)]
+    pub return_url: Option<String>,
+}
 
 #[derive(PartialEq, Eq, Clone, Validate)]
 #[cfg_attr(feature = "serialize", derive(serde::Serialize))]
@@ -193,3 +186,10 @@ pub struct GetForCallback {
     #[garde(url)]
     pub return_url: Option<String>,
 }
+use garde::Validate;
+// use crate::server::db::PrimaryDatabasePool;
+#[cfg(feature = "not-wasm32-unknown-unknown")]
+use super::{schema, PgPooledConnection};
+// #[cfg(feature="not-wasm32-unknown-unknown")]
+// use diesel::query_builder::{BatchInsert, ValuesClause,InsertStatement};
+use time;

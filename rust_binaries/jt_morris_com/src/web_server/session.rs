@@ -1,19 +1,3 @@
-pub use super::db::session::SessionError;
-use time;
-
-use core::str;
-use time::format_description::well_known::Iso8601;
-
-// #[cfg(feature="serialize",derive)]
-#[cfg_attr(any(feature = "debug", debug_assertions), derive(Debug))]
-#[allow(unused)]
-pub struct Session(super::db::session::Session);
-
-// default session length is five minutes for security
-pub const DEFAULT_SESSION_MAX_DURATION: time::Duration = time::Duration::minutes(5);
-pub const SESSION_MAX_DURATION: &str = "session.max_duration_seconds";
-
-pub const SESSION_COOKIE_NAME: &str = "session";
 
 // stay logged in for up to five minutes. Every request keeps you logged in for up to five minutes
 
@@ -128,3 +112,19 @@ impl<'r> rocket::request::FromRequest<'r> for Session {
         rocket::request::Outcome::Success(Self(session))
     }
 }
+
+// default session length is five minutes for security
+pub const DEFAULT_SESSION_MAX_DURATION: time::Duration = time::Duration::minutes(5);
+
+pub const SESSION_COOKIE_NAME: &str = "session";
+pub const SESSION_MAX_DURATION: &str = "session.max_duration_seconds";
+
+// #[cfg(feature="serialize",derive)]
+#[cfg_attr(any(feature = "debug", debug_assertions), derive(Debug))]
+#[allow(unused)]
+pub struct Session(super::db::session::Session);
+pub use super::db::session::SessionError;
+
+use core::str;
+use time::format_description::well_known::Iso8601;
+use time;

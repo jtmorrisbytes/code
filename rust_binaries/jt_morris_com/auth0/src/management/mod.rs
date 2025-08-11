@@ -1,10 +1,36 @@
-pub mod scopes;
-#[allow(unused)]
-pub struct Client {
-    client: reqwest::Client,
-    base_url: url::Url,
-    access_token: String,
-}
+
+// pub mod actions {
+//     #[derive(serde::Serialize, serde::Deserialize, Clone, PartialEq, Eq)]
+//     #[serde(rename_all = "camelCase")]
+//     pub struct GetActionsOptions {
+//         pub trigger_id: Option<String>,
+//         pub action_name: Option<String>,
+//         pub deployed: Option<bool>,
+//         pub per_page: Option<i32>,
+//         pub installed: Option<bool>,
+//     }
+//     pub struct Actions(Vec<Action>);
+//     pub struct Action;
+//     impl super::Client {
+//         pub async fn get_actions(
+//             &self,
+//             _options: GetActionsOptions,
+//         ) -> Result<Actions, anyhow::Error> {
+//             todo!()
+//         }
+//     }
+//     impl std::default::Default for GetActionsOptions {
+//         fn default() -> Self {
+//             Self {
+//                 action_name: None,
+//                 trigger_id: None,
+//                 deployed: None,
+//                 per_page: None,
+//                 installed: None,
+//             }
+//         }
+//     }
+// }
 
 impl Client {
     async fn _get_jwks(base_url: &url::Url) -> Result<jsonwebtoken::jwk::JwkSet, anyhow::Error> {
@@ -68,36 +94,10 @@ impl Client {
         })
     }
 }
-
-// pub mod actions {
-//     #[derive(serde::Serialize, serde::Deserialize, Clone, PartialEq, Eq)]
-//     #[serde(rename_all = "camelCase")]
-//     pub struct GetActionsOptions {
-//         pub trigger_id: Option<String>,
-//         pub action_name: Option<String>,
-//         pub deployed: Option<bool>,
-//         pub per_page: Option<i32>,
-//         pub installed: Option<bool>,
-//     }
-//     pub struct Actions(Vec<Action>);
-//     pub struct Action;
-//     impl super::Client {
-//         pub async fn get_actions(
-//             &self,
-//             _options: GetActionsOptions,
-//         ) -> Result<Actions, anyhow::Error> {
-//             todo!()
-//         }
-//     }
-//     impl std::default::Default for GetActionsOptions {
-//         fn default() -> Self {
-//             Self {
-//                 action_name: None,
-//                 trigger_id: None,
-//                 deployed: None,
-//                 per_page: None,
-//                 installed: None,
-//             }
-//         }
-//     }
-// }
+pub mod scopes;
+#[allow(unused)]
+pub struct Client {
+    client: reqwest::Client,
+    base_url: url::Url,
+    access_token: String,
+}

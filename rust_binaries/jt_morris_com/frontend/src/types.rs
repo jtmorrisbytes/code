@@ -1,20 +1,3 @@
-use serde::{Deserialize, Serialize};
-use webauthn_rs_proto::{CreationChallengeResponse, RegisterPublicKeyCredential};
-
-#[derive(serde::Serialize,Deserialize)]
-pub enum StartWebAuthnRegistrationResponse {
-    Ok{passkey_state_id: uuid::Uuid,ccr:CreationChallengeResponse},
-    MissingUsername,
-    DatabaseConnectionFailed(String),
-    UsernameLookupFailed(String),
-    WebAuthnError(String)
-}
-#[derive(Clone)]
-pub enum StartAuthenticationUIState {
-    WaitingForInput { error: Option<String> },
-    PerformingCCR { username: String, ccr_url: String },
-    RegisteringChallenge{passkey_state_id: uuid::Uuid,ccr: CreationChallengeResponse}
-}
 /// NOTE: partialeq does not check if ccr is equal! if the ccr changes, the ID must change too for the state to update.
 /// CCR does not implement PartialEq
 /// If you want to submit a pull request, or fork and add derive partial eq, or implement partialeq yourself, then go ahead
@@ -33,13 +16,29 @@ impl PartialEq for StartAuthenticationUIState {
     }
 }
 #[derive(Serialize,Deserialize)]
-pub struct FinishWebAuthnRegistrationBody {
-    pub passkey_state_id: uuid::Uuid,
-    pub public_key_request: RegisterPublicKeyCredential
-}
-#[derive(Serialize,Deserialize)]
 pub enum FinishWebAuthnRegistrationResponseBody {
     Ok,
     InvalidPasskeyState,
     WebAuthnError(String)
+}#[derive(Clone)]
+pub enum StartAuthenticationUIState {
+    WaitingForInput { error: Option<String> },
+    PerformingCCR { username: String, ccr_url: String },
+    RegisteringChallenge{passkey_state_id: uuid::Uuid,ccr: CreationChallengeResponse}
 }
+
+#[derive(serde::Serialize,Deserialize)]
+pub enum StartWebAuthnRegistrationResponse {
+    Ok{passkey_state_id: uuid::Uuid,ccr:CreationChallengeResponse},
+    MissingUsername,
+    DatabaseConnectionFailed(String),
+    UsernameLookupFailed(String),
+    WebAuthnError(String)
+}
+#[derive(Serialize,Deserialize)]
+pub struct FinishWebAuthnRegistrationBody {
+    pub passkey_state_id: uuid::Uuid,
+    pub public_key_request: RegisterPublicKeyCredential
+}
+use serde::{Deserialize, Serialize};
+use webauthn_rs_proto::{CreationChallengeResponse, RegisterPublicKeyCredential};

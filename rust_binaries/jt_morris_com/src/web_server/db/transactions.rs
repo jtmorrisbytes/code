@@ -1,58 +1,31 @@
 
+// #[cfg(test)]
+// pub(crate) mod tests {
+//     const TEST_AUTH0_USER_ID: &str = "auth0|6682093e90b963e367242a6f";
+//     #[tokio::test]
+//     pub async fn test_view_summary_of_transactions_group_by_name_vendor_and_category(
+//     ) -> Result<(), Box<dyn std::error::Error>> {
+//         let pool_1 = crate::tests::DB_POOL.clone();
+//         let pool_2 = pool_1.clone();
+//         let user_id = tokio::task::spawn_blocking(move || {
+//             // let connection = crate::tests::get_connection().unwrap();
+//             crate::get_user_id_from_auth0_user_id(pool_1, &TEST_AUTH0_USER_ID).unwrap()
+//         })
+//         .await
+//         .unwrap()
+//         .unwrap();
+//         // let user_id = uuid::uuid!("17220324-67dc-4dda-8ed8-c8bbb717706a");
 
-use super::{PgPool,schema};
-use time;
+//         tokio::task::spawn_blocking(move || {
+//             super::view_summary_of_transactions_group_by_name_vendor_and_category(pool_2, user_id)
+//         })
+//         .await
+//         .unwrap()
+//         .unwrap();
 
-
-
-use super::schema::transactions;
-use bigdecimal::{BigDecimal, Zero};
-
-
-use diesel::{prelude::*,QueryDsl};
-
-pub const VENDOR_DEFAULT_VALUE: &str = "UNKNOWN";
-
-#[allow(unused)]
-#[derive(PartialEq, Eq, Clone)]
-#[cfg_attr(feature = "serialize", derive(serde::Serialize))]
-#[cfg_attr(feature = "deserialize", derive(serde::Deserialize))]
-#[cfg_attr(feature = "debug", derive(Debug))]
-#[cfg_attr(
-    not(all(target_arch = "wasm32", target_os = "unknown")),
-    derive(Queryable,Insertable)
-)]
-#[cfg_attr(not(all(target_arch="wasm32",target_os="unknown")),diesel(table_name=schema::transactions))]
-pub struct Transaction {
-    id: uuid::Uuid,
-    pub total_cost: BigDecimal,
-    pub vendor: String,
-    pub date: time::Date,
-    pub user_id: uuid::Uuid,
-}
-impl Transaction {
-    pub fn id(&self) -> uuid::Uuid {
-        self.id
-    }
-}
-pub struct TransactionsUsersTransactions;
-#[derive(serde::Deserialize)]
-#[derive(serde::Serialize)]
-#[cfg_attr(any(feature = "debug", debug_assertions), derive(Debug))]
-#[derive(Clone)]
-pub struct BankOfAmericaTransaction {
-    pub date: time::Date,
-    pub description: String,
-    pub amount: BigDecimal,
-    #[allow(unused)]
-    pub running_balance: BigDecimal,
-}
-// we need a way to import transactions
-// start with bank of america
-pub struct BankOfAmericaTransactionImportErrors {
-    pub database_errors: Vec<anyhow::Error>,
-    pub parse_errors: Vec<anyhow::Error>,
-}
+//         Ok(())
+//     }
+// }
 impl BankOfAmericaTransactionImportErrors {
     pub fn new() -> Self {
         Self {
@@ -61,7 +34,11 @@ impl BankOfAmericaTransactionImportErrors {
         }
     }
 }
-pub const BANK_OF_AMERICA_DATE_FORMAT_STR: &str = "%m/%d/%Y";
+impl Transaction {
+    pub fn id(&self) -> uuid::Uuid {
+        self.id
+    }
+}
 
 // use crate::PgPooledConnection;
 #[cfg(not(all(target_arch="wasm32",target_os="unknown")))]
@@ -226,6 +203,9 @@ pub async fn import_bank_of_america_file_for_user(
 //     return Ok((successfully_uploaded, errors));
 todo!();
 }
+pub const BANK_OF_AMERICA_DATE_FORMAT_STR: &str = "%m/%d/%Y";
+
+pub const VENDOR_DEFAULT_VALUE: &str = "UNKNOWN";
 #[cfg(not(all(target_arch="wasm32",target_os="unknown")))]
 pub fn insert_bank_of_america_transactions_into_transactions_table_for_user(
     pool: PgPool,
@@ -293,31 +273,51 @@ pub fn view_summary_of_transactions_group_by_name_vendor_and_category(
     print!("{sql}");
     Ok(())
 }
+// we need a way to import transactions
+// start with bank of america
+pub struct BankOfAmericaTransactionImportErrors {
+    pub database_errors: Vec<anyhow::Error>,
+    pub parse_errors: Vec<anyhow::Error>,
+}
+#[derive(serde::Deserialize)]
+#[derive(serde::Serialize)]
+#[cfg_attr(any(feature = "debug", debug_assertions), derive(Debug))]
+#[derive(Clone)]
+pub struct BankOfAmericaTransaction {
+    pub date: time::Date,
+    pub description: String,
+    pub amount: BigDecimal,
+    #[allow(unused)]
+    pub running_balance: BigDecimal,
+}
+pub struct TransactionsUsersTransactions;
 
-// #[cfg(test)]
-// pub(crate) mod tests {
-//     const TEST_AUTH0_USER_ID: &str = "auth0|6682093e90b963e367242a6f";
-//     #[tokio::test]
-//     pub async fn test_view_summary_of_transactions_group_by_name_vendor_and_category(
-//     ) -> Result<(), Box<dyn std::error::Error>> {
-//         let pool_1 = crate::tests::DB_POOL.clone();
-//         let pool_2 = pool_1.clone();
-//         let user_id = tokio::task::spawn_blocking(move || {
-//             // let connection = crate::tests::get_connection().unwrap();
-//             crate::get_user_id_from_auth0_user_id(pool_1, &TEST_AUTH0_USER_ID).unwrap()
-//         })
-//         .await
-//         .unwrap()
-//         .unwrap();
-//         // let user_id = uuid::uuid!("17220324-67dc-4dda-8ed8-c8bbb717706a");
+#[allow(unused)]
+#[derive(PartialEq, Eq, Clone)]
+#[cfg_attr(feature = "serialize", derive(serde::Serialize))]
+#[cfg_attr(feature = "deserialize", derive(serde::Deserialize))]
+#[cfg_attr(feature = "debug", derive(Debug))]
+#[cfg_attr(
+    not(all(target_arch = "wasm32", target_os = "unknown")),
+    derive(Queryable,Insertable)
+)]
+#[cfg_attr(not(all(target_arch="wasm32",target_os="unknown")),diesel(table_name=schema::transactions))]
+pub struct Transaction {
+    id: uuid::Uuid,
+    pub total_cost: BigDecimal,
+    pub vendor: String,
+    pub date: time::Date,
+    pub user_id: uuid::Uuid,
+}
+use bigdecimal::{BigDecimal, Zero};
 
-//         tokio::task::spawn_blocking(move || {
-//             super::view_summary_of_transactions_group_by_name_vendor_and_category(pool_2, user_id)
-//         })
-//         .await
-//         .unwrap()
-//         .unwrap();
 
-//         Ok(())
-//     }
-// }
+use diesel::{prelude::*,QueryDsl};
+
+
+
+use super::schema::transactions;
+
+
+use super::{PgPool,schema};
+use time;

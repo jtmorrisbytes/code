@@ -1,3 +1,6 @@
+#[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
+fn main() {}
+
 #[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
 #[rocket::main]
 pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -14,7 +17,7 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // let (s,mut r) = tokio::sync::mpsc::unbounded_channel();
     let figment = rocket.figment().to_owned();
     let (tx, mut rx) = rocket::tokio::sync::mpsc::channel::<()>(1);
-     rocket::tokio::task::spawn(async move {
+    rocket::tokio::task::spawn(async move {
         let config = figment
             .extract_inner::<DatabaseConfig>("databases.primary")
             .unwrap();
@@ -40,13 +43,9 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     });
     let launch = rocket.launch().await;
-   
 
     // let _ = s.send(()).ok();
     let _ = launch?;
     tx.send(()).await.ok();
     Ok(())
 }
-
-#[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
-fn main() {}

@@ -1,7 +1,3 @@
-use std::str::FromStr;
-
-use proc_macro::TokenStream;
-use syn::{parse_macro_input, DeriveInput};
 
 #[proc_macro_derive(IntoTemplate)]
 pub fn derive_into_template(input: TokenStream) -> TokenStream {
@@ -22,3 +18,7 @@ pub fn derive_into_template(input: TokenStream) -> TokenStream {
         Err(e) => TokenStream::from_str(&format!(r#"compile_error("{}")"#, e.to_string())).unwrap(),
     }
 }
+
+use proc_macro::TokenStream;
+use std::str::FromStr;
+use syn::{parse_macro_input, DeriveInput};

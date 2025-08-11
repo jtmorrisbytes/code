@@ -1,50 +1,9 @@
-// param($out_dir = "$PsScriptRoot/dest")
-// $rust_target = "wasm32-unknown-unknown"
-// $crate_name = "login_page"
-// rustup update
-// rustup target add $rust_target
-// cargo install wasm-pack
-// cargo build -p $crate_name --release --target wasm32-unknown-unknown
-// $wasm_file = "$(Get-Location)\target\$rust_target\release\$crate_name.wasm"
-// wasm-bindgen  --target web --out-dir $out_dir $wasm_file
-
-use core::str;
-use std::{io::Read, path::PathBuf, process::Command, str::FromStr};
-
-use serde::Deserialize;
+const RUST_TARGET: &str = "wasm32-unknown-unknown";
 
 // const CONFIG_TOML_STR: &str = include_str!("../Cargo.toml");
 // const MANIFEST_DIR: &str = env!("CARGO_MANIFEST_DIR");
 // const DEFAULT_OUT_DIR: &str = "dist";
 const WASM_BINDGEN_TARGET: &str = "web";
-const RUST_TARGET: &str = "wasm32-unknown-unknown";
-#[derive(Deserialize, Debug)]
-pub struct PackageMetadata {
-    name: String,
-    // version:String,
-    // id:String,
-    // edition:String,
-    // license:Option<String>,
-    // description:Option<String>,
-    // #[serde(flatten)]
-    // other: HashMap<String,serde_json::Value>
-}
-#[derive(Deserialize, Debug)]
-pub struct CargoTomlFile {
-    package: PackageMetadata,
-}
-
-#[derive(Deserialize, Debug)]
-pub struct CargoMetadata {
-    packages: Vec<PackageMetadata>,
-    // workspace_members:Vec<String>,
-    // resolve: HashMap<String,serde_json::Value>,
-    target_directory: std::path::PathBuf,
-    workspace_root: std::path::PathBuf,
-    // #[serde(flatten)]
-    // other: HashMap<String,serde_json::Value>
-    // workspace_root: String
-}
 
 /// attempts to read a Rocket.toml file at the workspace root to determine where the public files are locate
 #[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
@@ -68,6 +27,9 @@ fn get_rocket_public_files_root(
         .map(|s| PathBuf::from_str(s).unwrap())
         .unwrap_or(workspace_root.join("public")))
 }
+
+#[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
+fn main() {}
 
 #[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
 pub fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -158,5 +120,43 @@ pub fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-#[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
-fn main() {}
+#[derive(Deserialize, Debug)]
+pub struct CargoMetadata {
+    packages: Vec<PackageMetadata>,
+    // workspace_members:Vec<String>,
+    // resolve: HashMap<String,serde_json::Value>,
+    target_directory: std::path::PathBuf,
+    workspace_root: std::path::PathBuf,
+    // #[serde(flatten)]
+    // other: HashMap<String,serde_json::Value>
+    // workspace_root: String
+}
+#[derive(Deserialize, Debug)]
+pub struct CargoTomlFile {
+    package: PackageMetadata,
+}
+#[derive(Deserialize, Debug)]
+pub struct PackageMetadata {
+    name: String,
+    // version:String,
+    // id:String,
+    // edition:String,
+    // license:Option<String>,
+    // description:Option<String>,
+    // #[serde(flatten)]
+    // other: HashMap<String,serde_json::Value>
+}
+// param($out_dir = "$PsScriptRoot/dest")
+// $rust_target = "wasm32-unknown-unknown"
+// $crate_name = "login_page"
+// rustup update
+// rustup target add $rust_target
+// cargo install wasm-pack
+// cargo build -p $crate_name --release --target wasm32-unknown-unknown
+// $wasm_file = "$(Get-Location)\target\$rust_target\release\$crate_name.wasm"
+// wasm-bindgen  --target web --out-dir $out_dir $wasm_file
+
+use core::str;
+
+use serde::Deserialize;
+use std::{io::Read, path::PathBuf, process::Command, str::FromStr};

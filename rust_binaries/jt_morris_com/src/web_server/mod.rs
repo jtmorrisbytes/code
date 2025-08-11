@@ -1,42 +1,44 @@
-pub use db;
-// pub mod auth_state;
-pub mod authentication;
-pub mod authorization;
-pub mod config;
-pub mod ops;
-pub mod registration;
-pub mod response;
-pub mod session;
-pub mod url;
-pub mod user;
-pub mod vehicles;
-// pub mod schema;
-pub mod ssr;
-
-use authentication::PasskeyRegistrationStateMemory;
-use authentication::WebAuthnFairing;
-use config::ServerConfig;
-use db::PrimaryDatabasePool;
-use response::{HtmlResponse, InternalServerError, UnauthorizedError};
-pub use rocket::tokio;
-use ssr::FrontendTemplatePathFairing;
-
-pub use authorization::AUTH0_BASE_SCOPES;
-
-// use webauthn_rs::prelude::*;
-
-// use sqlx::Connection;
-use time::format_description::well_known::Rfc3339;
-
+// pub type ManagedPoolsState<'a> = &'a rocket::State<HashMap<String, crate::server::db::PgPool>>;
 #[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
-#[rocket::catch(401)]
-pub async fn catch_unauthorized(_request: &rocket::Request<'_>) -> HtmlResponse {
-    HtmlResponse::unauthorized(UnauthorizedError::default())
+#[rocket::async_trait]
+impl<'r> rocket::request::FromRequest<'r> for RocketAbsoluteBaseUri {
+    type Error = anyhow::Error;
+    async fn from_request(
+        r: &'r rocket::Request<'_>,
+    ) -> rocket::request::Outcome<Self, Self::Error> {
+        let uri = r
+            .local_cache_async(async {
+                // let default = proc_macros::make_absolute_rocket_uri!();
+                let figment = r.rocket().figment();
+                // let server_config =
+
+                let config = ServerConfig::try_new_from_figment(figment).unwrap();
+                rocket::http::uri::Absolute::<'static>::parse_owned(
+                    config.public_base_url().to_string(),
+                )
+                .unwrap()
+            })
+            .await;
+        rocket::request::Outcome::Success(Self(uri.to_owned()))
+    }
+}
+#[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
+impl std::ops::Deref for RocketAbsoluteBaseUri {
+    type Target = rocket::http::uri::Absolute<'static>;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
 }
 #[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
 #[rocket::catch(500)]
 pub async fn catch_internal_server_error(_request: &rocket::Request<'_>) -> HtmlResponse {
     HtmlResponse::internal_server_error(InternalServerError::default())
+}
+
+#[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
+#[rocket::catch(401)]
+pub async fn catch_unauthorized(_request: &rocket::Request<'_>) -> HtmlResponse {
+    HtmlResponse::unauthorized(UnauthorizedError::default())
 }
 #[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
 #[rocket::get("/", format = "text/html")]
@@ -156,39 +158,37 @@ pub async fn rocket() -> Result<rocket::Rocket<rocket::Build>, Box<dyn std::erro
         .attach(rocket_dyn_templates::Template::fairing());
     Ok(rocket)
 }
+// pub mod auth_state;
+pub mod authentication;
+pub mod authorization;
+pub mod config;
+pub mod ops;
+pub mod registration;
+pub mod response;
+pub mod session;
+// pub mod schema;
+pub mod ssr;
+pub mod url;
+pub mod user;
+pub mod vehicles;
 #[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
 #[derive(Clone)]
 pub struct RocketAbsoluteBaseUri(pub rocket::http::uri::Absolute<'static>);
 #[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
-impl std::ops::Deref for RocketAbsoluteBaseUri {
-    type Target = rocket::http::uri::Absolute<'static>;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-#[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
 pub type ManagedPoolState<'a> = &'a rocket::State<db::PgPool>;
-// pub type ManagedPoolsState<'a> = &'a rocket::State<HashMap<String, crate::server::db::PgPool>>;
-#[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
-#[rocket::async_trait]
-impl<'r> rocket::request::FromRequest<'r> for RocketAbsoluteBaseUri {
-    type Error = anyhow::Error;
-    async fn from_request(
-        r: &'r rocket::Request<'_>,
-    ) -> rocket::request::Outcome<Self, Self::Error> {
-        let uri = r
-            .local_cache_async(async {
-                // let default = proc_macros::make_absolute_rocket_uri!();
-                let figment = r.rocket().figment();
-                // let server_config =
 
-                let config = ServerConfig::try_new_from_figment(figment).unwrap();
-                rocket::http::uri::Absolute::<'static>::parse_owned(
-                    config.public_base_url().to_string(),
-                )
-                .unwrap()
-            })
-            .await;
-        rocket::request::Outcome::Success(Self(uri.to_owned()))
-    }
-}
+pub use authorization::AUTH0_BASE_SCOPES;
+pub use db;
+pub use rocket::tokio;
+
+use authentication::PasskeyRegistrationStateMemory;
+use authentication::WebAuthnFairing;
+use config::ServerConfig;
+use db::PrimaryDatabasePool;
+use response::{HtmlResponse, InternalServerError, UnauthorizedError};
+use ssr::FrontendTemplatePathFairing;
+
+// use webauthn_rs::prelude::*;
+
+// use sqlx::Connection;
+use time::format_description::well_known::Rfc3339;

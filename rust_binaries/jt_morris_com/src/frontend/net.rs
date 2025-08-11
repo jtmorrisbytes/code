@@ -1,11 +1,5 @@
 #![allow(warnings)]
 
-use serde::{Deserialize, Serialize};
-#[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
-use webauthn_rs::prelude::{CreationChallengeResponse, RegisterPublicKeyCredential};
-#[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
-use webauthn_rs_proto::{CreationChallengeResponse, RegisterPublicKeyCredential};
-
 //start webauthn registration
 #[allow(warnings)]
 macro_rules! ok_or_return {
@@ -19,44 +13,13 @@ macro_rules! ok_or_return {
         }
     };
 }
-
-#[derive(Serialize, Deserialize)]
-pub struct StartWebAuthnRegistrationResponse {
-    pub passkey_state_id: uuid::Uuid,
-    pub ccr: CreationChallengeResponse,
+pub async fn generate_credentials_challenge_response(
+    _ccr_url: &str,
+    username: &str,
+) -> Result<StartWebAuthnRegistrationResponseBody, anyhow::Error> {
+    let url = format!("/authentication/start-webauthn-registration?username={username}");
+    perform_msgpack_request(reqwest::Method::POST, &url, &()).await
 }
-#[derive(Serialize, Deserialize, Debug, thiserror::Error)]
-#[error("Start webautn registration failed {0}")]
-pub enum StartWebAuthnRegistrationError {
-    #[error("Missing username in request parameters")]
-    MissingUsername,
-    #[error("Database connection failed {0}")]
-    DatabaseConnectionFailed(String),
-    #[error("username lookup failed {0}")]
-    UsernameLookupFailed(String),
-    #[error("WebAuthnError {0}")]
-    WebAuthnError(String),
-}
-/// returned from perform_ccr_request
-pub type StartWebAuthnRegistrationResponseBody =
-    Result<StartWebAuthnRegistrationResponse, StartWebAuthnRegistrationError>;
-
-#[derive(Serialize, Deserialize)]
-pub struct FinishWebAuthnRegistrationBody {
-    pub passkey_state_id: uuid::Uuid,
-    pub public_key_request: RegisterPublicKeyCredential,
-}
-
-#[derive(thiserror::Error, Debug, Serialize, Deserialize)]
-pub enum FinishWebAuthnRegistrationResponseErrorKind {
-    #[error("Invalid Passkey State")]
-    InvalidPasskeyState,
-    #[error("WebAuthnError: {0}")]
-    WebAuthnError(String),
-}
-#[allow(unused)]
-pub type FinishWebAuthnRegistrationResponseBody =
-    Result<(), FinishWebAuthnRegistrationResponseErrorKind>;
 
 pub async fn perform_msgpack_request<Body, Output>(
     method: reqwest::Method,
@@ -88,16 +51,53 @@ where
     let output: Output = rmp_serde::from_slice(&bytes)?;
     Ok(output)
 }
-pub async fn generate_credentials_challenge_response(
-    _ccr_url: &str,
-    username: &str,
-) -> Result<StartWebAuthnRegistrationResponseBody, anyhow::Error> {
-    let url = format!("/authentication/start-webauthn-registration?username={username}");
-    perform_msgpack_request(reqwest::Method::POST, &url, &()).await
-}
 pub async fn register_webauthn_public_key(
     body: FinishWebAuthnRegistrationBody,
 ) -> Result<(), anyhow::Error> {
     const URL: &str = "/authentication/finish-webauthn-registration";
     perform_msgpack_request(reqwest::Method::POST, URL, &body).await
 }
+
+#[derive(thiserror::Error, Debug, Serialize, Deserialize)]
+pub enum FinishWebAuthnRegistrationResponseErrorKind {
+    #[error("Invalid Passkey State")]
+    InvalidPasskeyState,
+    #[error("WebAuthnError: {0}")]
+    WebAuthnError(String),
+}
+#[derive(Serialize, Deserialize, Debug, thiserror::Error)]
+#[error("Start webautn registration failed {0}")]
+pub enum StartWebAuthnRegistrationError {
+    #[error("Missing username in request parameters")]
+    MissingUsername,
+    #[error("Database connection failed {0}")]
+    DatabaseConnectionFailed(String),
+    #[error("username lookup failed {0}")]
+    UsernameLookupFailed(String),
+    #[error("WebAuthnError {0}")]
+    WebAuthnError(String),
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct FinishWebAuthnRegistrationBody {
+    pub passkey_state_id: uuid::Uuid,
+    pub public_key_request: RegisterPublicKeyCredential,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct StartWebAuthnRegistrationResponse {
+    pub passkey_state_id: uuid::Uuid,
+    pub ccr: CreationChallengeResponse,
+}
+#[allow(unused)]
+pub type FinishWebAuthnRegistrationResponseBody =
+    Result<(), FinishWebAuthnRegistrationResponseErrorKind>;
+/// returned from perform_ccr_request
+pub type StartWebAuthnRegistrationResponseBody =
+    Result<StartWebAuthnRegistrationResponse, StartWebAuthnRegistrationError>;
+
+use serde::{Deserialize, Serialize};
+#[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
+use webauthn_rs::prelude::{CreationChallengeResponse, RegisterPublicKeyCredential};
+#[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
+use webauthn_rs_proto::{CreationChallengeResponse, RegisterPublicKeyCredential};

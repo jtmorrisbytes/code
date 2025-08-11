@@ -1,126 +1,5 @@
-pub mod actor;
-pub mod camera;
-pub mod controller;
-pub mod cube;
-pub mod model;
-pub mod obj;
-pub mod opengl;
-pub mod scene;
-
-use actor::Actor;
-use camera::Camera;
-use glam::{Mat4, Vec4Swizzles};
-
-// TODO: Once basics of graphics set up, we want to be able to script some code outside of the engine
-
-use std::{io::Read, u64};
-
-use glfw::{Action, Context, Key};
-
-use crate::scene::Scene;
-#[derive(Clone)]
-pub struct Vec4f {
-    x: f32,
-    y: f32,
-    z: f32,
-    w: f32,
-}
-impl Vec4f {
-    pub fn new(x: f32, y: f32, z: f32, w: f32) -> Self {
-        Self { x, y, z, w }
-    }
-    pub fn x(&self) -> f32 {
-        self.x
-    }
-    pub fn y(&self) -> f32 {
-        self.y
-    }
-    pub fn z(&self) -> f32 {
-        self.z
-    }
-}
 
 const GL_CLEAR_COLOR: (f32, f32, f32, f32) = (0.5, 0.5, 0.5, 1.0);
-
-pub struct Game {
-    scene: Scene,
-    frame_count: u64,
-    // right now, we only have support for one global vertex shader
-    vertex_shader: Shader,
-    fragment_shader: Shader,
-    projection_matrix: [f32; 16],
-    view_matrix: [f32; 16],
-    // camera: Camera,
-}
-pub extern "system" fn debug_message_callback(
-    _source: u32,
-    _ty: u32,
-    _id: u32,
-    _severity: u32,
-    _length: gl::types::GLsizei,
-    _msg: *const i8,
-    _usrdata: *mut std::ffi::c_void,
-) {
-    // let cstr = unsafe { std::ffi::CStr::from_ptr(msg) };
-    // let message = cstr.to_string_lossy().to_string();
-    // println!("{source},{ty},{id},{severity},{message}");
-}
-
-pub struct Shader {
-    kind: gl::types::GLenum,
-    shader_id: gl::types::GLuint,
-    program_id: gl::types::GLuint,
-}
-impl Shader {
-    pub fn create_from_file(
-        kind: gl::types::GLenum,
-        path: &str,
-        program_id: Option<gl::types::GLuint>,
-    ) -> Result<Self, String> {
-        // compile shader on the fly
-        let shader_id = unsafe { gl::CreateShader(kind) };
-        let program_id = program_id.unwrap_or(unsafe { gl::CreateProgram() });
-        unsafe {
-            gl::AttachShader(program_id, shader_id);
-        }
-        opengl::compile_shader_from_file(shader_id, path)
-            .map_err(|e| format!("failed to compile {e}"))?;
-        unsafe {
-            gl::LinkProgram(program_id);
-        }
-        // check for errors
-        let mut success: gl::types::GLint = 0;
-        unsafe { gl::GetProgramiv(program_id, gl::LINK_STATUS, &mut success) }
-        if success != 1 {
-            return Err(format!("Failed to link program"));
-        }
-        return Ok(Self {
-            program_id,
-            shader_id,
-            kind,
-        });
-    }
-    pub fn try_get_uniform_location(&self, name: &str) -> Result<gl::types::GLint, String> {
-        let cstr_name = std::ffi::CString::new(name).unwrap();
-        let index = unsafe { gl::GetUniformLocation(self.program_id, cstr_name.as_ptr()) };
-        if index < 0 {
-            return Err(format!(
-                "glGetUniformLocation: location for variable {name} not found or is invalid"
-            ));
-        } else {
-            return Ok(index);
-        }
-    }
-    pub fn kind(&self) -> gl::types::GLenum {
-        self.kind
-    }
-    pub fn shader_id(&self) -> gl::types::GLuint {
-        self.shader_id
-    }
-    pub fn program_id(&self) -> gl::types::GLuint {
-        self.program_id
-    }
-}
 
 // all of the 'objects' or 'actors' within the current 'world'
 
@@ -334,3 +213,124 @@ impl Game {
         }
     }
 }
+impl Shader {
+    pub fn create_from_file(
+        kind: gl::types::GLenum,
+        path: &str,
+        program_id: Option<gl::types::GLuint>,
+    ) -> Result<Self, String> {
+        // compile shader on the fly
+        let shader_id = unsafe { gl::CreateShader(kind) };
+        let program_id = program_id.unwrap_or(unsafe { gl::CreateProgram() });
+        unsafe {
+            gl::AttachShader(program_id, shader_id);
+        }
+        opengl::compile_shader_from_file(shader_id, path)
+            .map_err(|e| format!("failed to compile {e}"))?;
+        unsafe {
+            gl::LinkProgram(program_id);
+        }
+        // check for errors
+        let mut success: gl::types::GLint = 0;
+        unsafe { gl::GetProgramiv(program_id, gl::LINK_STATUS, &mut success) }
+        if success != 1 {
+            return Err(format!("Failed to link program"));
+        }
+        return Ok(Self {
+            program_id,
+            shader_id,
+            kind,
+        });
+    }
+    pub fn try_get_uniform_location(&self, name: &str) -> Result<gl::types::GLint, String> {
+        let cstr_name = std::ffi::CString::new(name).unwrap();
+        let index = unsafe { gl::GetUniformLocation(self.program_id, cstr_name.as_ptr()) };
+        if index < 0 {
+            return Err(format!(
+                "glGetUniformLocation: location for variable {name} not found or is invalid"
+            ));
+        } else {
+            return Ok(index);
+        }
+    }
+    pub fn kind(&self) -> gl::types::GLenum {
+        self.kind
+    }
+    pub fn shader_id(&self) -> gl::types::GLuint {
+        self.shader_id
+    }
+    pub fn program_id(&self) -> gl::types::GLuint {
+        self.program_id
+    }
+}
+impl Vec4f {
+    pub fn new(x: f32, y: f32, z: f32, w: f32) -> Self {
+        Self { x, y, z, w }
+    }
+    pub fn x(&self) -> f32 {
+        self.x
+    }
+    pub fn y(&self) -> f32 {
+        self.y
+    }
+    pub fn z(&self) -> f32 {
+        self.z
+    }
+}
+pub extern "system" fn debug_message_callback(
+    _source: u32,
+    _ty: u32,
+    _id: u32,
+    _severity: u32,
+    _length: gl::types::GLsizei,
+    _msg: *const i8,
+    _usrdata: *mut std::ffi::c_void,
+) {
+    // let cstr = unsafe { std::ffi::CStr::from_ptr(msg) };
+    // let message = cstr.to_string_lossy().to_string();
+    // println!("{source},{ty},{id},{severity},{message}");
+}
+pub mod actor;
+pub mod camera;
+pub mod controller;
+pub mod cube;
+pub mod model;
+pub mod obj;
+pub mod opengl;
+pub mod scene;
+
+pub struct Game {
+    scene: Scene,
+    frame_count: u64,
+    // right now, we only have support for one global vertex shader
+    vertex_shader: Shader,
+    fragment_shader: Shader,
+    projection_matrix: [f32; 16],
+    view_matrix: [f32; 16],
+    // camera: Camera,
+}
+
+pub struct Shader {
+    kind: gl::types::GLenum,
+    shader_id: gl::types::GLuint,
+    program_id: gl::types::GLuint,
+}
+#[derive(Clone)]
+pub struct Vec4f {
+    x: f32,
+    y: f32,
+    z: f32,
+    w: f32,
+}
+
+use actor::Actor;
+use camera::Camera;
+
+use crate::scene::Scene;
+use glam::{Mat4, Vec4Swizzles};
+
+use glfw::{Action, Context, Key};
+
+// TODO: Once basics of graphics set up, we want to be able to script some code outside of the engine
+
+use std::{io::Read, u64};

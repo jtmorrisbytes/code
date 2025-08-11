@@ -1,91 +1,3 @@
-// use rocket::time as time;
-// use diesel::prelude::*;
-// use crate::schema;
-use crate::{PgPool, PgPooledConnection};
-use diesel_async::RunQueryDsl;
-use garde::Validate;
-
-#[derive(diesel::Queryable, diesel::Insertable, diesel::AsChangeset, PartialEq, Eq, Validate)]
-#[cfg_attr(feature = "serialize", derive(serde::Serialize))]
-#[cfg_attr(feature = "deserialize", derive(serde::Deserialize))]
-#[cfg_attr(feature = "debug", derive(Debug))]
-#[diesel(table_name=super::schema::users)]
-pub struct User {
-    #[garde(skip)]
-    pub id: uuid::Uuid,
-    #[garde(skip)]
-    pub auth0_user_id: String,
-    #[garde(skip)]
-    pub full_name: String,
-    #[garde(email)]
-    pub email: Option<String>,
-    #[garde(skip)]
-    pub picture: Option<String>,
-    #[garde(url)]
-    pub profile: Option<String>,
-    #[garde(skip)]
-    pub username: String,
-    #[garde(phone_number)]
-    pub phone_number: Option<String>,
-}
-impl User {
-    // pub fn new(
-    //     auth0_user_id: &str,
-    //     full_name: &str,
-    //     email: &str,
-    //     phone_number: Option<&str>,
-    //     picture: Option<&str>,
-    //     profile: Option<&str>,
-    //     username: String,
-    // ) -> Self {
-    //     Self {
-    //         id: uuid::Uuid::new_v4(),
-    //         auth0_user_id: auth0_user_id.to_string(),
-    //         full_name: full_name.to_string(),
-    //         email: Some(email.to_string()),
-    //         phone_number: phone_number.map(|s| s.to_string()),
-    //         picture: picture.map(|s| s.to_string()),
-    //         profile: profile.map(|s| s.to_string()),
-    //         username
-    //     }
-    // }
-    // pub fn get_by_username(pool: PrimaryDatabasePool) {
-
-    // }
-}
-/// a module containing frequently used queries. any query that can be seperated from the execution of the query should be placed here for
-/// reusabillity
-pub mod query_builder {
-    use crate::schema::users::{auth0_user_id, id, table, username};
-    #[diesel::dsl::auto_type]
-    pub fn check_username_unique<'a>(username_: &'a str) -> _ {
-        use diesel::{ExpressionMethods, QueryDsl};
-        // if any username matches the string given above, return its id, otherwise return nothing
-        table.select(id).filter(username.eq(username_))
-    }
-    #[diesel::dsl::auto_type]
-    pub fn check_email_unique<'a>(email_: &'a str) -> _ {
-        use diesel::{ExpressionMethods, QueryDsl};
-        crate::schema::users::table
-            .select(crate::schema::users::id)
-            .filter(crate::schema::users::email.eq(email_))
-    }
-    #[diesel::dsl::auto_type]
-    pub fn select_id() -> _ {
-        use diesel::QueryDsl;
-        table.select(id)
-    }
-    #[diesel::dsl::auto_type]
-    pub fn get_user_id_from_auth0_user_id<'a>(id_: &'a str) -> _ {
-        use diesel::{ExpressionMethods, QueryDsl};
-        select_id().filter(auth0_user_id.eq(id_))
-    }
-    #[diesel::dsl::auto_type]
-    pub fn get_user_from_auth0_user_id(id_: String) -> _ {
-        use diesel::{ExpressionMethods, QueryDsl};
-        table.filter(auth0_user_id.eq(id_))
-    }
-}
 #[cfg(feature = "not-wasm32-unknown-unknown")]
 impl User {
     // some validation methods
@@ -294,3 +206,91 @@ impl User {
         todo!()
     }
 }
+impl User {
+    // pub fn new(
+    //     auth0_user_id: &str,
+    //     full_name: &str,
+    //     email: &str,
+    //     phone_number: Option<&str>,
+    //     picture: Option<&str>,
+    //     profile: Option<&str>,
+    //     username: String,
+    // ) -> Self {
+    //     Self {
+    //         id: uuid::Uuid::new_v4(),
+    //         auth0_user_id: auth0_user_id.to_string(),
+    //         full_name: full_name.to_string(),
+    //         email: Some(email.to_string()),
+    //         phone_number: phone_number.map(|s| s.to_string()),
+    //         picture: picture.map(|s| s.to_string()),
+    //         profile: profile.map(|s| s.to_string()),
+    //         username
+    //     }
+    // }
+    // pub fn get_by_username(pool: PrimaryDatabasePool) {
+
+    // }
+}
+/// a module containing frequently used queries. any query that can be seperated from the execution of the query should be placed here for
+/// reusabillity
+pub mod query_builder {
+    use crate::schema::users::{auth0_user_id, id, table, username};
+    #[diesel::dsl::auto_type]
+    pub fn check_username_unique<'a>(username_: &'a str) -> _ {
+        use diesel::{ExpressionMethods, QueryDsl};
+        // if any username matches the string given above, return its id, otherwise return nothing
+        table.select(id).filter(username.eq(username_))
+    }
+    #[diesel::dsl::auto_type]
+    pub fn check_email_unique<'a>(email_: &'a str) -> _ {
+        use diesel::{ExpressionMethods, QueryDsl};
+        crate::schema::users::table
+            .select(crate::schema::users::id)
+            .filter(crate::schema::users::email.eq(email_))
+    }
+    #[diesel::dsl::auto_type]
+    pub fn select_id() -> _ {
+        use diesel::QueryDsl;
+        table.select(id)
+    }
+    #[diesel::dsl::auto_type]
+    pub fn get_user_id_from_auth0_user_id<'a>(id_: &'a str) -> _ {
+        use diesel::{ExpressionMethods, QueryDsl};
+        select_id().filter(auth0_user_id.eq(id_))
+    }
+    #[diesel::dsl::auto_type]
+    pub fn get_user_from_auth0_user_id(id_: String) -> _ {
+        use diesel::{ExpressionMethods, QueryDsl};
+        table.filter(auth0_user_id.eq(id_))
+    }
+}
+
+#[derive(diesel::Queryable, diesel::Insertable, diesel::AsChangeset, PartialEq, Eq, Validate)]
+#[cfg_attr(feature = "serialize", derive(serde::Serialize))]
+#[cfg_attr(feature = "deserialize", derive(serde::Deserialize))]
+#[cfg_attr(feature = "debug", derive(Debug))]
+#[diesel(table_name=super::schema::users)]
+pub struct User {
+    #[garde(skip)]
+    pub id: uuid::Uuid,
+    #[garde(skip)]
+    pub auth0_user_id: String,
+    #[garde(skip)]
+    pub full_name: String,
+    #[garde(email)]
+    pub email: Option<String>,
+    #[garde(skip)]
+    pub picture: Option<String>,
+    #[garde(url)]
+    pub profile: Option<String>,
+    #[garde(skip)]
+    pub username: String,
+    #[garde(phone_number)]
+    pub phone_number: Option<String>,
+}
+// use rocket::time as time;
+// use diesel::prelude::*;
+// use crate::schema;
+use crate::{PgPool, PgPooledConnection};
+use diesel_async::RunQueryDsl;
+use garde::Validate;

@@ -1,15 +1,3 @@
-pub struct Camera {
-    /// where is our camera in world space?
-    position: glam::Vec3,
-    /// what is the camera looking at?
-    target: glam::Vec3,
-    /// what direction is up, relative to the camera
-    up: glam::Vec3,
-    /// what direction is right relative to the camera
-    right: glam::Vec3,
-    // the vector starting at the target pointing to the camera along its Z axis
-    direction: glam::Vec3,
-}
 impl Camera {
     pub fn calculate_direction_vector(position: glam::Vec3, target: glam::Vec3) -> glam::Vec3 {
         (position - target).normalize()
@@ -58,4 +46,16 @@ impl Camera {
     pub fn set_position(&mut self, position: glam::Vec3) {
         self.position = position
     }
+}
+pub struct Camera {
+    /// where is our camera in world space?
+    position: glam::Vec3,
+    /// what is the camera looking at?
+    target: glam::Vec3,
+    /// what direction is up, relative to the camera
+    up: glam::Vec3,
+    /// what direction is right relative to the camera
+    right: glam::Vec3,
+    // the vector starting at the target pointing to the camera along its Z axis
+    direction: glam::Vec3,
 }

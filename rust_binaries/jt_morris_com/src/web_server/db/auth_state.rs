@@ -1,159 +1,3 @@
-use super::_url::Url;
-// use crate::server::db::PrimaryDatabasePool;
-pub use crate::db::auth_state::AuthState;
-#[cfg(all(not(target_arch="wasm32"),not(target_os="unknown")))]
-use super::{schema, PgPooledConnection};
-#[cfg(all(not(target_arch="wasm32"),not(target_os="unknown")))]
-use diesel::query_builder::{BatchInsert, ValuesClause,InsertStatement};
-use time;
-
-#[derive(PartialEq, Clone, Eq, Debug)]
-#[cfg_attr(feature = "serialize", derive(serde::Serialize))]
-#[cfg_attr(feature = "deserialize", derive(serde::Deserialize))]
-// #[cfg_attr(feature="debug",derive(Debug))]
-#[cfg_attr(
-    not(all(target_arch = "wasm32", target_os = "unknown")),
-    derive(
-        diesel::prelude::QueryableByName,
-        diesel::Insertable,
-        diesel::AsExpression
-    )
-)]
-#[cfg_attr(not(all(target_arch="wasm32",target_os="unknown")),diesel(table_name= super::schema::auth_state))]
-#[cfg_attr(not(all(target_arch="wasm32",target_os="unknown")),diesel(sql_type=diesel::sql_types::Text))]
-
-pub struct ReturnUrl(
-    #[cfg_attr(
-        not(all(target_arch = "wasm32", target_os = "unknown")),
-        diesel(column_name = "redirect_url")
-    )]
-    pub(crate) Url,
-);
-impl std::ops::Deref for ReturnUrl {
-    type Target = url::Url;
-    fn deref(&self) -> &Self::Target {
-        &*self.0
-    }
-}
-impl std::convert::AsRef<url::Url> for ReturnUrl {
-    fn as_ref(&self) -> &url::Url {
-        self.0.as_ref()
-    }
-}
-#[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
-impl diesel::serialize::ToSql<diesel::sql_types::Text, diesel::pg::Pg> for ReturnUrl {
-    fn to_sql<'b>(
-        &'b self,
-        out: &mut diesel::serialize::Output<'b, '_, diesel::pg::Pg>,
-    ) -> diesel::serialize::Result {
-        // self.0.to_sql(&mut out.reborrow())
-        <super::_url::Url as diesel::serialize::ToSql<diesel::sql_types::Text,diesel::pg::Pg>>::to_sql(&self.0, &mut out.reborrow())
-    }
-}
-
-#[derive(PartialEq, Clone, Eq, Debug)]
-#[cfg_attr(feature = "serialize", derive(serde::Serialize))]
-#[cfg_attr(feature = "deserialize", derive(serde::Deserialize))]
-// #[cfg_attr(feature="debug",derive(Debug))]
-#[cfg_attr(
-    not(all(target_arch = "wasm32", target_os = "unknown")),
-    derive(diesel::prelude::QueryableByName, diesel::Insertable, diesel::AsExpression)
-)]
-#[cfg_attr(not(all(target_arch="wasm32",target_os="unknown")),diesel(table_name= super::schema::auth_state))]
-#[cfg_attr(not(all(target_arch="wasm32",target_os="unknown")),diesel(sql_type=diesel::sql_types::Text))]
-
-pub struct RedirectUrl(
-    #[cfg_attr(
-        not(all(target_arch = "wasm32", target_os = "unknown")),
-        diesel(column_name = "return_url")
-    )]
-    pub(crate) Url,
-);
-impl std::ops::Deref for RedirectUrl {
-    type Target = url::Url;
-    fn deref(&self) -> &Self::Target {
-        &*self.0
-    }
-}
-impl std::convert::AsRef<url::Url> for RedirectUrl {
-    fn as_ref(&self) -> &url::Url {
-        self.0.as_ref()
-    }
-}
-#[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
-impl diesel::serialize::ToSql<diesel::sql_types::Text, diesel::pg::Pg> for RedirectUrl {
-    fn to_sql<'b>(
-        &'b self,
-        out: &mut diesel::serialize::Output<'b, '_, diesel::pg::Pg>,
-    ) -> diesel::serialize::Result {
-        // self.0.to_sql(&mut out.reborrow())
-        <super::_url::Url as diesel::serialize::ToSql<diesel::sql_types::Text,diesel::pg::Pg>>::to_sql(&self.0, &mut out.reborrow())
-    }
-}
-
-#[derive(PartialEq, Eq, Clone)]
-#[cfg_attr(feature = "serialize", derive(serde::Serialize))]
-#[cfg_attr(feature = "deserialize", derive(serde::Deserialize))]
-#[cfg_attr(feature = "debug", derive(Debug))]
-#[cfg_attr(
-    not(all(target_arch = "wasm32", target_os = "unknown")),
-    derive(diesel::Queryable, diesel::Insertable, diesel::AsChangeset)
-)]
-#[cfg_attr(not(all(target_arch="wasm32",target_os="unknown")),diesel(table_name=super::schema::auth_state))]
-pub struct AuthState {
-    pub id: uuid::Uuid,
-    pub started: time::OffsetDateTime,
-    pub return_url: Option<ReturnUrl>,
-    pub scope: String,
-    pub redirect_url: RedirectUrl,
-}
-impl AuthState {
-    pub fn new(return_url: Option<&url::Url>, scope: &str, redirect_url: &url::Url) -> Self {
-        Self {
-            id: uuid::Uuid::new_v4(),
-            started: time::OffsetDateTime::now_utc(),
-            return_url: return_url.map(|u| ReturnUrl(Url(u.to_owned()))),
-            scope: scope.to_string(),
-            redirect_url: RedirectUrl(Url(redirect_url.to_owned())),
-        }
-    }
-}
-#[macro_export]
-macro_rules! _columns {
-    ($path:path)=>{
-        paste::paste!{crate::web_server::db::schema::auth_state::$path}
-    };
-    ($($path:path),+) => {
-        paste::paste!{
-            ($(crate::web_server::db::schema::auth_state::$path,)*)
-        }
-    };
-}
-
-
-// this only works if you use the fully qualified path?
-super::implement_crud!(crate::web_server::db::schema::auth_state,AuthState);
-
-
-#[derive(PartialEq, Clone, Eq, Debug)]
-#[cfg_attr(feature = "serialize", derive(serde::Serialize))]
-#[cfg_attr(feature = "deserialize", derive(serde::Deserialize))]
-// #[cfg_attr(feature="debug",derive(Debug))]
-#[cfg_attr(
-    not(all(target_arch = "wasm32", target_os = "unknown")),
-    derive(diesel::prelude::QueryableByName)
-)]
-#[cfg_attr(not(all(target_arch="wasm32",target_os="unknown")),diesel(table_name=super::schema::auth_state))]
-pub struct GetForCallback{
-    scope:String,redirect_url:RedirectUrl,return_url:ReturnUrl
-}
-
-
-pub async fn get_for_callback(state:String, connection: &mut PgPooledConnection) -> Result<GetForCallback,anyhow::Error> {
-        let returning = _columns!(scope,redirect_url,return_url);
-        let query = self::delete_by_id!(state,returning);
-        super::get_result!(query,connection)
-}
 
 
 
@@ -229,6 +73,77 @@ impl AuthState {
             .map_err(|e| anyhow::Error::new(e))
     }
 }
+impl AuthState {
+    pub fn new(return_url: Option<&url::Url>, scope: &str, redirect_url: &url::Url) -> Self {
+        Self {
+            id: uuid::Uuid::new_v4(),
+            started: time::OffsetDateTime::now_utc(),
+            return_url: return_url.map(|u| ReturnUrl(Url(u.to_owned()))),
+            scope: scope.to_string(),
+            redirect_url: RedirectUrl(Url(redirect_url.to_owned())),
+        }
+    }
+}
+#[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
+impl diesel::serialize::ToSql<diesel::sql_types::Text, diesel::pg::Pg> for RedirectUrl {
+    fn to_sql<'b>(
+        &'b self,
+        out: &mut diesel::serialize::Output<'b, '_, diesel::pg::Pg>,
+    ) -> diesel::serialize::Result {
+        // self.0.to_sql(&mut out.reborrow())
+        <super::_url::Url as diesel::serialize::ToSql<diesel::sql_types::Text,diesel::pg::Pg>>::to_sql(&self.0, &mut out.reborrow())
+    }
+}
+#[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
+impl diesel::serialize::ToSql<diesel::sql_types::Text, diesel::pg::Pg> for ReturnUrl {
+    fn to_sql<'b>(
+        &'b self,
+        out: &mut diesel::serialize::Output<'b, '_, diesel::pg::Pg>,
+    ) -> diesel::serialize::Result {
+        // self.0.to_sql(&mut out.reborrow())
+        <super::_url::Url as diesel::serialize::ToSql<diesel::sql_types::Text,diesel::pg::Pg>>::to_sql(&self.0, &mut out.reborrow())
+    }
+}
+impl std::convert::AsRef<url::Url> for RedirectUrl {
+    fn as_ref(&self) -> &url::Url {
+        self.0.as_ref()
+    }
+}
+impl std::convert::AsRef<url::Url> for ReturnUrl {
+    fn as_ref(&self) -> &url::Url {
+        self.0.as_ref()
+    }
+}
+impl std::ops::Deref for RedirectUrl {
+    type Target = url::Url;
+    fn deref(&self) -> &Self::Target {
+        &*self.0
+    }
+}
+impl std::ops::Deref for ReturnUrl {
+    type Target = url::Url;
+    fn deref(&self) -> &Self::Target {
+        &*self.0
+    }
+}
+#[macro_export]
+macro_rules! _columns {
+    ($path:path)=>{
+        paste::paste!{crate::web_server::db::schema::auth_state::$path}
+    };
+    ($($path:path),+) => {
+        paste::paste!{
+            ($(crate::web_server::db::schema::auth_state::$path,)*)
+        }
+    };
+}
+
+
+pub async fn get_for_callback(state:String, connection: &mut PgPooledConnection) -> Result<GetForCallback,anyhow::Error> {
+        let returning = _columns!(scope,redirect_url,return_url);
+        let query = self::delete_by_id!(state,returning);
+        super::get_result!(query,connection)
+}
 
 #[derive(PartialEq, Eq, Clone)]
 #[cfg_attr(feature = "serialize", derive(serde::Serialize))]
@@ -244,3 +159,88 @@ pub struct AuthStateOnlyScopeRedirectUrlAndReturnUrl {
     pub redirect_url: String,
     pub return_url: Option<String>,
 }
+
+#[derive(PartialEq, Eq, Clone)]
+#[cfg_attr(feature = "serialize", derive(serde::Serialize))]
+#[cfg_attr(feature = "deserialize", derive(serde::Deserialize))]
+#[cfg_attr(feature = "debug", derive(Debug))]
+#[cfg_attr(
+    not(all(target_arch = "wasm32", target_os = "unknown")),
+    derive(diesel::Queryable, diesel::Insertable, diesel::AsChangeset)
+)]
+#[cfg_attr(not(all(target_arch="wasm32",target_os="unknown")),diesel(table_name=super::schema::auth_state))]
+pub struct AuthState {
+    pub id: uuid::Uuid,
+    pub started: time::OffsetDateTime,
+    pub return_url: Option<ReturnUrl>,
+    pub scope: String,
+    pub redirect_url: RedirectUrl,
+}
+
+
+#[derive(PartialEq, Clone, Eq, Debug)]
+#[cfg_attr(feature = "serialize", derive(serde::Serialize))]
+#[cfg_attr(feature = "deserialize", derive(serde::Deserialize))]
+// #[cfg_attr(feature="debug",derive(Debug))]
+#[cfg_attr(
+    not(all(target_arch = "wasm32", target_os = "unknown")),
+    derive(diesel::prelude::QueryableByName)
+)]
+#[cfg_attr(not(all(target_arch="wasm32",target_os="unknown")),diesel(table_name=super::schema::auth_state))]
+pub struct GetForCallback{
+    scope:String,redirect_url:RedirectUrl,return_url:ReturnUrl
+}
+
+#[derive(PartialEq, Clone, Eq, Debug)]
+#[cfg_attr(feature = "serialize", derive(serde::Serialize))]
+#[cfg_attr(feature = "deserialize", derive(serde::Deserialize))]
+// #[cfg_attr(feature="debug",derive(Debug))]
+#[cfg_attr(
+    not(all(target_arch = "wasm32", target_os = "unknown")),
+    derive(diesel::prelude::QueryableByName, diesel::Insertable, diesel::AsExpression)
+)]
+#[cfg_attr(not(all(target_arch="wasm32",target_os="unknown")),diesel(table_name= super::schema::auth_state))]
+#[cfg_attr(not(all(target_arch="wasm32",target_os="unknown")),diesel(sql_type=diesel::sql_types::Text))]
+
+pub struct RedirectUrl(
+    #[cfg_attr(
+        not(all(target_arch = "wasm32", target_os = "unknown")),
+        diesel(column_name = "return_url")
+    )]
+    pub(crate) Url,
+);
+
+#[derive(PartialEq, Clone, Eq, Debug)]
+#[cfg_attr(feature = "serialize", derive(serde::Serialize))]
+#[cfg_attr(feature = "deserialize", derive(serde::Deserialize))]
+// #[cfg_attr(feature="debug",derive(Debug))]
+#[cfg_attr(
+    not(all(target_arch = "wasm32", target_os = "unknown")),
+    derive(
+        diesel::prelude::QueryableByName,
+        diesel::Insertable,
+        diesel::AsExpression
+    )
+)]
+#[cfg_attr(not(all(target_arch="wasm32",target_os="unknown")),diesel(table_name= super::schema::auth_state))]
+#[cfg_attr(not(all(target_arch="wasm32",target_os="unknown")),diesel(sql_type=diesel::sql_types::Text))]
+
+pub struct ReturnUrl(
+    #[cfg_attr(
+        not(all(target_arch = "wasm32", target_os = "unknown")),
+        diesel(column_name = "redirect_url")
+    )]
+    pub(crate) Url,
+);
+// use crate::server::db::PrimaryDatabasePool;
+pub use crate::db::auth_state::AuthState;
+
+
+// this only works if you use the fully qualified path?
+super::implement_crud!(crate::web_server::db::schema::auth_state,AuthState);
+#[cfg(all(not(target_arch="wasm32"),not(target_os="unknown")))]
+use diesel::query_builder::{BatchInsert, ValuesClause,InsertStatement};
+use super::_url::Url;
+#[cfg(all(not(target_arch="wasm32"),not(target_os="unknown")))]
+use super::{schema, PgPooledConnection};
+use time;

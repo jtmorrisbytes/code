@@ -1,12 +1,3 @@
-use super::authorization::{
-    AccessToken, AccessTokenRequestError, AUTH0_BASE_SCOPES, SCOPE_ACCESS_OPS,
-};
-use proc_macros::IntoTemplate;
-// use rocket::Request;
-// use rocket_db_pools::diesel::prelude::RunQueryDsl;
-// use rocket_dyn_templates::Template;
-
-pub struct AccessOpsToken(AccessToken);
 #[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
 #[rocket::async_trait]
 impl<'r> rocket::request::FromRequest<'r> for AccessOpsToken {
@@ -45,52 +36,6 @@ impl std::ops::Deref for AccessOpsToken {
     fn deref(&self) -> &Self::Target {
         &self.0
     }
-}
-
-// use crate::PrimaryDatabase;
-//
-
-// /// This is a permmission string that will allow access to the ops application
-// #[cfg(not(all(target_arch="wasm32",target_os="unknown")))]
-// pub fn reauthorize_on_access_token_error<'r>(
-//     access_token_result: Result<AccessToken, &'r str>,
-//     // server_config: &crate::ServerConfig,
-// ) -> Result<AccessToken, rocket::response::Redirect> {
-//     if access_token_result.is_err() {
-//         let access_token_error_message = access_token_result.unwrap_err();
-//         tracing::debug!("{access_token_error_message}");
-//         return Err(rocket::response::Redirect::to(rocket::uri!(
-//             super::authorization::authorize(Some(SCOPE_ACCESS_OPS), Option::<String>::None,)
-//         )));
-//     } else {
-//         Ok(access_token_result.unwrap())
-//     }
-// }
-// #[cfg(not(all(target_arch="wasm32",target_os="unknown")))]
-
-// pub fn reauthorize_when_access_token_does_not_contain_access_ops_scope(
-//     access_token: &AccessToken,
-//     // server_config: &crate::ServerConfig,
-// ) -> Result<(), rocket::response::Redirect> {
-//     if !access_token.permissions().contains(&SCOPE_ACCESS_OPS) {
-//         tracing::debug!("Access token missing required scope {SCOPE_ACCESS_OPS}.");
-//         let mut scopes = access_token.permissions().clone();
-//         scopes.push(SCOPE_ACCESS_OPS);
-//         let scopes = scopes.join(",");
-//         Err(rocket::response::Redirect::to(rocket::uri!(
-//             crate::authorization::authorize(
-//                 Some(scopes),
-//                 Option::<String>::None // server_config.auth0_audience()
-//             )
-//         )))
-//     } else {
-//         Ok(())
-//     }
-// }
-
-#[derive(serde::Serialize, IntoTemplate)]
-pub struct RenderOpsIndexContext {
-    ops_list_users_href: String,
 }
 #[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
 #[rocket::get("/ops", format = "text/html")]
@@ -152,3 +97,58 @@ pub async fn render_ops_users_list(
 ) -> Result<rocket_dyn_templates::Template, rocket::response::Redirect> {
     todo!("ops.users.list");
 }
+// use rocket::Request;
+// use rocket_db_pools::diesel::prelude::RunQueryDsl;
+// use rocket_dyn_templates::Template;
+
+pub struct AccessOpsToken(AccessToken);
+
+// use crate::PrimaryDatabase;
+//
+
+// /// This is a permmission string that will allow access to the ops application
+// #[cfg(not(all(target_arch="wasm32",target_os="unknown")))]
+// pub fn reauthorize_on_access_token_error<'r>(
+//     access_token_result: Result<AccessToken, &'r str>,
+//     // server_config: &crate::ServerConfig,
+// ) -> Result<AccessToken, rocket::response::Redirect> {
+//     if access_token_result.is_err() {
+//         let access_token_error_message = access_token_result.unwrap_err();
+//         tracing::debug!("{access_token_error_message}");
+//         return Err(rocket::response::Redirect::to(rocket::uri!(
+//             super::authorization::authorize(Some(SCOPE_ACCESS_OPS), Option::<String>::None,)
+//         )));
+//     } else {
+//         Ok(access_token_result.unwrap())
+//     }
+// }
+// #[cfg(not(all(target_arch="wasm32",target_os="unknown")))]
+
+// pub fn reauthorize_when_access_token_does_not_contain_access_ops_scope(
+//     access_token: &AccessToken,
+//     // server_config: &crate::ServerConfig,
+// ) -> Result<(), rocket::response::Redirect> {
+//     if !access_token.permissions().contains(&SCOPE_ACCESS_OPS) {
+//         tracing::debug!("Access token missing required scope {SCOPE_ACCESS_OPS}.");
+//         let mut scopes = access_token.permissions().clone();
+//         scopes.push(SCOPE_ACCESS_OPS);
+//         let scopes = scopes.join(",");
+//         Err(rocket::response::Redirect::to(rocket::uri!(
+//             crate::authorization::authorize(
+//                 Some(scopes),
+//                 Option::<String>::None // server_config.auth0_audience()
+//             )
+//         )))
+//     } else {
+//         Ok(())
+//     }
+// }
+
+#[derive(serde::Serialize, IntoTemplate)]
+pub struct RenderOpsIndexContext {
+    ops_list_users_href: String,
+}
+use proc_macros::IntoTemplate;
+use super::authorization::{
+    AccessToken, AccessTokenRequestError, AUTH0_BASE_SCOPES, SCOPE_ACCESS_OPS,
+};

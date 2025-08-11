@@ -1,12 +1,7 @@
-use std::io::BufRead;
-
-const VERTEX: &str = "v";
 const COMMENT: &str = "#";
 const FACE: &str = "f";
 
-pub struct Obj{
-    vertices: std::collections::BTreeMap<u32,glam::Vec4>
-}
+const VERTEX: &str = "v";
 impl Obj {
     pub fn list_verticies(&self) -> Vec<glam::Vec4> {
         self.vertices.values().into_iter().map(|v| v.to_owned()).collect()
@@ -18,16 +13,6 @@ impl Obj {
         self.vertices.to_owned()
     }
     
-}
-
-
-
-#[cfg(test)]
-#[test]
-pub fn test_parse_obj(){
-    let path = std::env::var("CARGO_MANIFEST_DIR").unwrap();
-    let path = std::path::PathBuf::from(path).join("teapot.obj");
-    parse_obj(path.to_str().unwrap()).unwrap();
 }
 
 pub fn parse_obj(path: &str) -> Result<Obj, Box<dyn std::error::Error>> {
@@ -80,3 +65,17 @@ pub fn parse_obj(path: &str) -> Result<Obj, Box<dyn std::error::Error>> {
     }
     Ok(Obj{vertices})
 }
+
+
+#[cfg(test)]
+#[test]
+pub fn test_parse_obj(){
+    let path = std::env::var("CARGO_MANIFEST_DIR").unwrap();
+    let path = std::path::PathBuf::from(path).join("teapot.obj");
+    parse_obj(path.to_str().unwrap()).unwrap();
+}
+
+pub struct Obj{
+    vertices: std::collections::BTreeMap<u32,glam::Vec4>
+}
+use std::io::BufRead;

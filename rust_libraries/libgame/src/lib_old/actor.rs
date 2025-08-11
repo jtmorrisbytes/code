@@ -1,5 +1,4 @@
-use glam::Vec3;
-use super::model::Model;
+
 pub struct Cube {
     position: Vec3,
     name:String,
@@ -16,4 +15,5 @@ pub trait Actor {
     fn get_position(&self) -> glam::Vec3;
     fn get_rotation(&self) -> (f32,f32,f32);
 }
-
+use glam::Vec3;
+use super::model::Model;

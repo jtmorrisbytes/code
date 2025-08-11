@@ -1,41 +1,13 @@
-// use rocket::{form::ValueField, State};
-// use std::{collections::HashMap, fmt::Write};
-#[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
-use rocket::figment::{
-    providers::{Env, Format, Toml},
-    Figment, Profile,
-};
-pub const DEFAULT_DATABASE_MAX_CONNECTIONS: u32 = 20;
-pub const PRIMARY_DATABASE_KEY: &str = "primary";
-#[derive(serde::Serialize, serde::Deserialize)]
-pub struct ServerConfig {
-    public_base_url: url::Url,
-    auth0_domain: String,
-    auth0_client_id: String,
-    auth0_client_secret: String,
-    auth0_audience: String,
-    // database_url: url::Url,
-    // database_max_connections: u32,
-
-    // // #[cfg(feature)]
-    // aws_s3_endpoint: url::Url,
-    // aws_s3_access_key: String,
-    // aws_s3_secret_key: String,
-    public_files_dir: String,
-    support_email: String,
-    // template_files_root:String
-}
-// some of this code was yanked directly from rocket 0.5.1
-/// Use this function to mimic configuration loading like the rocket does, except it only reads from the default profile.
-/// this is needed to avoid direct dependencies on rocket itself in contexts like proc macros, small libraries, etc where
-/// creating an entire server is not needed. otherwise use Rocket::figment().
-#[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
-pub fn rocket_figment() -> Figment {
-    // use figment::providers::Format;
-    Figment::new()
-        .merge(Toml::file(Env::var_or("ROCKET_CONFIG", "Rocket.toml")).nested())
-        .merge(Env::prefixed("ROCKET_").ignore(&["PROFILE"]).global())
-        .select(Profile::from_env_or("ROCKET_PROFILE", Profile::Default))
+impl DatabaseConfigs {
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+    pub fn iter(&self) -> impl std::iter::Iterator<Item = (&String, &DatabaseConfig)> {
+        self.0.iter()
+    }
+    pub fn into_iter(self) -> impl std::iter::Iterator<Item = (String, DatabaseConfig)> {
+        self.0.into_iter()
+    }
 }
 
 impl ServerConfig {
@@ -116,22 +88,50 @@ impl ServerConfig {
     //     &self.aws_s3_secret_key.as_str()
     // }
 }
+pub const DEFAULT_DATABASE_MAX_CONNECTIONS: u32 = 20;
+pub const PRIMARY_DATABASE_KEY: &str = "primary";
+// some of this code was yanked directly from rocket 0.5.1
+/// Use this function to mimic configuration loading like the rocket does, except it only reads from the default profile.
+/// this is needed to avoid direct dependencies on rocket itself in contexts like proc macros, small libraries, etc where
+/// creating an entire server is not needed. otherwise use Rocket::figment().
+#[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
+pub fn rocket_figment() -> Figment {
+    // use figment::providers::Format;
+    Figment::new()
+        .merge(Toml::file(Env::var_or("ROCKET_CONFIG", "Rocket.toml")).nested())
+        .merge(Env::prefixed("ROCKET_").ignore(&["PROFILE"]).global())
+        .select(Profile::from_env_or("ROCKET_PROFILE", Profile::Default))
+}
+#[derive(serde::Serialize, serde::Deserialize, Clone)]
+pub struct DatabaseConfigs(std::collections::HashMap<String, DatabaseConfig>);
 
 #[derive(serde::Serialize, serde::Deserialize, Clone)]
 pub struct DatabaseConfig {
     pub url: url::Url,
     pub max_connections: usize,
 }
-#[derive(serde::Serialize, serde::Deserialize, Clone)]
-pub struct DatabaseConfigs(std::collections::HashMap<String, DatabaseConfig>);
-impl DatabaseConfigs {
-    pub fn len(&self) -> usize {
-        self.0.len()
-    }
-    pub fn iter(&self) -> impl std::iter::Iterator<Item = (&String, &DatabaseConfig)> {
-        self.0.iter()
-    }
-    pub fn into_iter(self) -> impl std::iter::Iterator<Item = (String, DatabaseConfig)> {
-        self.0.into_iter()
-    }
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct ServerConfig {
+    public_base_url: url::Url,
+    auth0_domain: String,
+    auth0_client_id: String,
+    auth0_client_secret: String,
+    auth0_audience: String,
+    // database_url: url::Url,
+    // database_max_connections: u32,
+
+    // // #[cfg(feature)]
+    // aws_s3_endpoint: url::Url,
+    // aws_s3_access_key: String,
+    // aws_s3_secret_key: String,
+    public_files_dir: String,
+    support_email: String,
+    // template_files_root:String
 }
+// use rocket::{form::ValueField, State};
+// use std::{collections::HashMap, fmt::Write};
+#[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
+use rocket::figment::{
+    providers::{Env, Format, Toml},
+    Figment, Profile,
+};

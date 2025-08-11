@@ -1,55 +1,3 @@
-// #[cfg(all(target_arch="wasm32",target_os="unknown"))]
-pub(crate) mod wasm32_unknown_unknown;
-// #[cfg(not(all(target_arch="wasm32",target_os="unknown")))]
-pub(crate) mod net;
-pub(crate) mod not_wasm32_unknown_unknown;
-pub(crate) mod types;
-
-pub use rmp_serde;
-use serde::{Deserialize, Serialize};
-use std::sync::Arc;
-use types::StartAuthenticationUIState;
-use yew::prelude::*;
-
-#[derive(PartialEq, Properties, Default)]
-pub struct HtmlDocumentProperties {
-    pub children: Html,
-    pub title: String,
-}
-
-#[derive(serde::Serialize, serde::Deserialize, PartialEq, Clone)]
-pub enum Route {
-    StartAuthentication {
-        // title:String,
-        ccr_url: String,
-        username: Option<String>,
-    },
-}
-impl Route {
-    /// determines the title of the webpage depending on the route used
-    pub fn title(&self) -> &'static str {
-        match self {
-            &Self::StartAuthentication {
-                ccr_url: _,
-                username: _,
-            } => "Start Authentication",
-        }
-    }
-}
-
-#[derive(PartialEq, Eq, Properties)]
-pub struct StartAuthenticationPageProperties {
-    pub ccr_url: Arc<String>,
-    pub username: Arc<Option<String>>,
-}
-impl std::default::Default for StartAuthenticationPageProperties {
-    fn default() -> Self {
-        Self {
-            ccr_url: Arc::new("./".to_string()),
-            username: Arc::new(None),
-        }
-    }
-}
 /// starts the ccr request when the form is submitted
 
 #[yew::function_component(StartAuthenticationPage)]
@@ -208,11 +156,39 @@ fn start_authentication(properties: &StartAuthenticationPageProperties) -> yew::
     };
     html
 }
+impl Route {
+    /// determines the title of the webpage depending on the route used
+    pub fn title(&self) -> &'static str {
+        match self {
+            &Self::StartAuthentication {
+                ccr_url: _,
+                username: _,
+            } => "Start Authentication",
+        }
+    }
+}
+impl std::default::Default for StartAuthenticationPageProperties {
+    fn default() -> Self {
+        Self {
+            ccr_url: Arc::new("./".to_string()),
+            username: Arc::new(None),
+        }
+    }
+}
+// #[cfg(not(all(target_arch="wasm32",target_os="unknown")))]
+pub(crate) mod net;
+pub(crate) mod not_wasm32_unknown_unknown;
+pub(crate) mod types;
+// #[cfg(all(target_arch="wasm32",target_os="unknown"))]
+pub(crate) mod wasm32_unknown_unknown;
 
-#[derive(Serialize, Deserialize, Properties, PartialEq)]
-pub struct FrontendAppProperties {
-    pub title: String,
-    pub route: Route,
+#[derive(serde::Serialize, serde::Deserialize, PartialEq, Clone)]
+pub enum Route {
+    StartAuthentication {
+        // title:String,
+        ccr_url: String,
+        username: Option<String>,
+    },
 }
 
 #[yew::function_component(FrontendApp)]
@@ -234,3 +210,27 @@ pub fn frontend_app(properties: &FrontendAppProperties) -> yew::Html {
         }
     }
 }
+
+#[derive(Serialize, Deserialize, Properties, PartialEq)]
+pub struct FrontendAppProperties {
+    pub title: String,
+    pub route: Route,
+}
+
+#[derive(PartialEq, Properties, Default)]
+pub struct HtmlDocumentProperties {
+    pub children: Html,
+    pub title: String,
+}
+
+#[derive(PartialEq, Eq, Properties)]
+pub struct StartAuthenticationPageProperties {
+    pub ccr_url: Arc<String>,
+    pub username: Arc<Option<String>>,
+}
+
+pub use rmp_serde;
+use serde::{Deserialize, Serialize};
+use std::sync::Arc;
+use types::StartAuthenticationUIState;
+use yew::prelude::*;

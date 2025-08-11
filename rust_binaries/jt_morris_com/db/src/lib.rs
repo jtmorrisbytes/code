@@ -5,41 +5,105 @@
     unused_variables
 )]
 #![deny(warnings)]
+#[cfg(all(feature = "rocket", feature = "not-wasm32-unknown-unknown"))]
+#[rocket::async_trait]
+impl<'r> rocket::request::FromRequest<'r> for PrimaryDatabasePoolConnection {
+    type Error = anyhow::Error;
+    async fn from_request(
+        r: &'r rocket::Request<'_>,
+    ) -> rocket::request::Outcome<Self, Self::Error> {
+        let pool = match r.guard::<&rocket::State<PrimaryDatabasePool>>().await {
+            rocket::request::Outcome::Success(pool) => pool.inner(),
+            rocket::request::Outcome::Error((status, _error)) => {
+                return rocket::request::Outcome::Error((
+                    status,
+                    anyhow::Error::msg("Failed to extract primary database pool from state"),
+                ));
+            }
+            rocket::request::Outcome::Forward(_) => unimplemented!(),
+        };
 
-// We are using diesel-async as our backend with diesel as the query builder. tls is provided by rustls,
-// currently the only options are sslmode=none and sslmode-verify-full
+        match pool.get().await {
+            Ok(conn) => rocket::request::Outcome::Success(Self(conn)),
+            Err(e) => rocket::request::Outcome::Error((
+                rocket::http::Status::InternalServerError,
+                anyhow::Error::new(e),
+            )),
+        }
+    }
+}
+#[cfg(all(feature = "rocket", feature = "not-wasm32-unknown-unknown"))]
+#[rocket::async_trait]
+impl<'r> rocket::request::FromRequest<'r> for PrimaryDatabasePool {
+    type Error = anyhow::Error;
+    async fn from_request(
+        r: &'r rocket::Request<'_>,
+    ) -> rocket::request::Outcome<Self, Self::Error> {
+        let pool = match r.guard::<&rocket::State<Self>>().await {
+            rocket::request::Outcome::Success(pools) => pools.inner(),
+            rocket::request::Outcome::Error((status, _error)) => {
+                return rocket::request::Outcome::Error((
+                    status,
+                    anyhow::Error::msg("Failed to extract primary database pool from state"),
+                ));
+            }
+            rocket::request::Outcome::Forward(_) => unimplemented!(),
+        };
 
-pub mod _url;
-pub mod auth_state;
-pub mod schema;
-pub mod session;
-pub mod transactions;
-pub mod user;
+        rocket::request::Outcome::Success(pool.to_owned())
+    }
+}
 
-pub use diesel;
 #[cfg(feature = "not-wasm32-unknown-unknown")]
-pub use diesel_async;
-
-#[cfg(feature = "not-wasm32-unknown-unknown")]
-pub type PgPool =
-    diesel_async::pooled_connection::deadpool::Pool<diesel_async::pg::AsyncPgConnection>;
-#[cfg(feature = "wasm32-unknown-unknown")]
-pub type PgPool = ();
-
-#[cfg(feature = "not-wasm32-unknown-unknown")]
-pub type Connection = diesel_async::pg::AsyncPgConnection;
-#[cfg(feature = "wasm32-unknown-unknown")]
-pub type Connection = ();
-
-#[cfg(feature = "not-wasm32-unknown-unknown")]
-pub type PgPooledConnection =
-    diesel_async::pooled_connection::deadpool::Object<diesel_async::pg::AsyncPgConnection>;
-#[cfg(feature = "wasm32-unknown-unknown")]
-pub type PgPooledConnection = ();
-
-use diesel_migrations::embed_migrations;
-pub use diesel_migrations::{EmbeddedMigrations, MigrationHarness};
-pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!();
+impl PrimaryDatabasePool {
+    pub async fn get_connection(&self) -> Result<PrimaryDatabasePoolConnection, anyhow::Error> {
+        Ok(PrimaryDatabasePoolConnection(self.0.get().await?))
+    }
+    /// creates a new instance of this type from a figment instance from the path 'databases.primary'.
+    /// expects the path to conform to type crate::DatabaseConfig
+    #[cfg(feature = "figment")]
+    pub async fn try_new_from_figment(figment: &figment::Figment) -> Result<Self, anyhow::Error> {
+        let url: url::Url = figment.extract_inner("databases.primary.url")?;
+        let max_connections: usize = figment.extract_inner("databases.primary.max_connections")?;
+        let pool = self::create_pool(url.as_str(), max_connections)
+            .await
+            .map_err(|e| {
+                anyhow::Error::msg(e.to_string())
+                    .context("While attempting to create the primary database pool")
+            })?;
+        Ok(Self(pool))
+    }
+}
+impl PrimaryDatabasePool {
+    pub fn inner(&self) -> self::PgPool {
+        self.0.to_owned()
+    }
+    pub fn into_inner(self) -> self::PgPool {
+        self.0.clone()
+    }
+}
+impl std::ops::DerefMut for PrimaryDatabasePoolConnection {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+impl std::ops::DerefMut for PrimaryDatabasePool {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut (self.0)
+    }
+}
+impl std::ops::Deref for PrimaryDatabasePoolConnection {
+    type Target = PgPooledConnection;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+impl std::ops::Deref for PrimaryDatabasePool {
+    type Target = self::PgPool;
+    fn deref(&self) -> &Self::Target {
+        &(self.0)
+    }
+}
 
 // helper macros that determine which piece of code you need to run without writing all of it
 // #[macro_export]
@@ -163,149 +227,47 @@ macro_rules! implement_crud {
     };
 }
 
-#[derive(Clone)]
-pub struct PrimaryDatabasePool(PgPool);
-
 #[cfg(feature = "not-wasm32-unknown-unknown")]
-impl PrimaryDatabasePool {
-    pub async fn get_connection(&self) -> Result<PrimaryDatabasePoolConnection, anyhow::Error> {
-        Ok(PrimaryDatabasePoolConnection(self.0.get().await?))
-    }
-    /// creates a new instance of this type from a figment instance from the path 'databases.primary'.
-    /// expects the path to conform to type crate::DatabaseConfig
-    #[cfg(feature = "figment")]
-    pub async fn try_new_from_figment(figment: &figment::Figment) -> Result<Self, anyhow::Error> {
-        let url: url::Url = figment.extract_inner("databases.primary.url")?;
-        let max_connections: usize = figment.extract_inner("databases.primary.max_connections")?;
-        let pool = self::create_pool(url.as_str(), max_connections)
-            .await
-            .map_err(|e| {
-                anyhow::Error::msg(e.to_string())
-                    .context("While attempting to create the primary database pool")
-            })?;
-        Ok(Self(pool))
-    }
-}
-impl PrimaryDatabasePool {
-    pub fn inner(&self) -> self::PgPool {
-        self.0.to_owned()
-    }
-    pub fn into_inner(self) -> self::PgPool {
-        self.0.clone()
-    }
-}
-impl std::ops::Deref for PrimaryDatabasePool {
-    type Target = self::PgPool;
-    fn deref(&self) -> &Self::Target {
-        &(self.0)
-    }
-}
-impl std::ops::DerefMut for PrimaryDatabasePool {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut (self.0)
-    }
-}
-#[cfg(all(feature = "rocket", feature = "not-wasm32-unknown-unknown"))]
-#[rocket::async_trait]
-impl<'r> rocket::request::FromRequest<'r> for PrimaryDatabasePool {
-    type Error = anyhow::Error;
-    async fn from_request(
-        r: &'r rocket::Request<'_>,
-    ) -> rocket::request::Outcome<Self, Self::Error> {
-        let pool = match r.guard::<&rocket::State<Self>>().await {
-            rocket::request::Outcome::Success(pools) => pools.inner(),
-            rocket::request::Outcome::Error((status, _error)) => {
-                return rocket::request::Outcome::Error((
-                    status,
-                    anyhow::Error::msg("Failed to extract primary database pool from state"),
-                ));
-            }
-            rocket::request::Outcome::Forward(_) => unimplemented!(),
-        };
+pub async fn create_pool(
+    database_url: &str,
+    max_connections: usize,
+) -> Result<PgPool, anyhow::Error> {
+    use diesel_async::{
+        pooled_connection::{deadpool::Pool, AsyncDieselConnectionManager, ManagerConfig},
+        AsyncPgConnection,
+    };
+    tracing::info!("The async backend uses the equivalent of sslmode=verify-full. if you get connection errors, please double check your certificates");
 
-        rocket::request::Outcome::Success(pool.to_owned())
-    }
-}
+    let mut manager_config: ManagerConfig<AsyncPgConnection> = ManagerConfig::default();
+    manager_config.custom_setup = Box::new(establish_connection);
+    let config = AsyncDieselConnectionManager::<diesel_async::AsyncPgConnection>::new_with_config(
+        database_url,
+        manager_config,
+    );
 
-pub struct PrimaryDatabasePoolConnection(PgPooledConnection);
-#[cfg(all(feature = "rocket", feature = "not-wasm32-unknown-unknown"))]
-#[rocket::async_trait]
-impl<'r> rocket::request::FromRequest<'r> for PrimaryDatabasePoolConnection {
-    type Error = anyhow::Error;
-    async fn from_request(
-        r: &'r rocket::Request<'_>,
-    ) -> rocket::request::Outcome<Self, Self::Error> {
-        let pool = match r.guard::<&rocket::State<PrimaryDatabasePool>>().await {
-            rocket::request::Outcome::Success(pool) => pool.inner(),
-            rocket::request::Outcome::Error((status, _error)) => {
-                return rocket::request::Outcome::Error((
-                    status,
-                    anyhow::Error::msg("Failed to extract primary database pool from state"),
-                ));
-            }
-            rocket::request::Outcome::Forward(_) => unimplemented!(),
-        };
+    let pool = Pool::builder(config).max_size(max_connections).build()?;
 
-        match pool.get().await {
-            Ok(conn) => rocket::request::Outcome::Success(Self(conn)),
-            Err(e) => rocket::request::Outcome::Error((
-                rocket::http::Status::InternalServerError,
-                anyhow::Error::new(e),
-            )),
-        }
-    }
-}
-impl std::ops::Deref for PrimaryDatabasePoolConnection {
-    type Target = PgPooledConnection;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-impl std::ops::DerefMut for PrimaryDatabasePoolConnection {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
-
-#[cfg(feature = "not-wasm32-unknown-unknown")]
-#[allow(unused)]
-pub async fn run_migrations(
-    connection: &mut impl MigrationHarness<diesel::pg::Pg>,
-) -> Result<(), anyhow::Error> {
-    // This will run the necessary migrations.
-    //
-    // See the documentation for `MigrationHarness` for
-    // all available methods.
-    connection
-        .run_pending_migrations(MIGRATIONS)
-        .map(|_| ())
-        .map_err(|e| anyhow::Error::msg(e.to_string()))
-}
-
-// #[cfg(feature = "not-wasm32-unknown-unknown")]
-// pub async fn insert_user_on_auth_callback(
-//     pool: self::PgPool,
-//     u: user::User,
-// ) -> Result<user::User, anyhow::Error> {
-//     if u.email.is_none() {
-//         tracing::error!("Email is now a requied field. you need to promt the user for their email address");
-//         return Err(anyhow::Error::msg("Email is a required field"));
-//     }
-//     let email = u.email.unwrap();
-//     user::User::create_returning_self(pool, &u.auth0_user_id, &u.full_name, &email, u.picture.as_deref(), u.profile.as_deref(), u.username).await
-
-// }
-#[cfg(feature = "not-wasm32-unknown-unknown")]
-pub async fn insert_auth_state_returning_id(
-    connection: &mut PgPooledConnection,
-    auth_state: auth_state::AuthState,
-) -> Result<uuid::Uuid, anyhow::Error> {
-    auth_state.insert_returning_id(connection).await
+    Ok(pool)
 }
 #[cfg(feature = "not-wasm32-unknown-unknown")]
 
-pub async fn get_all_time_income_for_user_async() -> Result<(), anyhow::Error> {
-    todo!()
+pub async fn get_all_time_expenses_for_user(
+    pool: self::PgPool,
+    user_id: &uuid::Uuid,
+) -> Result<Option<bigdecimal::BigDecimal>, anyhow::Error> {
+    use diesel::{ExpressionMethods, QueryDsl};
+    use diesel_async::RunQueryDsl;
+    let mut connection = pool.get().await?;
+    schema::transactions::table
+        .select(diesel::dsl::sum(schema::transactions::total_cost))
+        .filter(
+            schema::transactions::total_cost
+                .lt(<bigdecimal::BigDecimal as bigdecimal::Zero>::zero()),
+        )
+        .filter(schema::transactions::user_id.eq(user_id))
+        .get_result(&mut connection)
+        .await
+        .map_err(|e| anyhow::Error::new(e))
 }
 #[cfg(feature = "not-wasm32-unknown-unknown")]
 
@@ -330,53 +292,56 @@ pub async fn get_all_time_income_for_user(
 }
 #[cfg(feature = "not-wasm32-unknown-unknown")]
 
-pub async fn get_all_time_expenses_for_user(
-    pool: self::PgPool,
-    user_id: &uuid::Uuid,
-) -> Result<Option<bigdecimal::BigDecimal>, anyhow::Error> {
-    use diesel::{ExpressionMethods, QueryDsl};
-    use diesel_async::RunQueryDsl;
-    let mut connection = pool.get().await?;
-    schema::transactions::table
-        .select(diesel::dsl::sum(schema::transactions::total_cost))
-        .filter(
-            schema::transactions::total_cost
-                .lt(<bigdecimal::BigDecimal as bigdecimal::Zero>::zero()),
-        )
-        .filter(schema::transactions::user_id.eq(user_id))
-        .get_result(&mut connection)
-        .await
-        .map_err(|e| anyhow::Error::new(e))
+pub async fn get_all_time_income_for_user_async() -> Result<(), anyhow::Error> {
+    todo!()
 }
-// configures a deafult crypto provider. this function needs to be called once in main();
-pub fn initialize_rustls() {
-    let _ = rustls::crypto::aws_lc_rs::default_provider()
-        .install_default()
-        .ok();
+
+// #[cfg(feature = "not-wasm32-unknown-unknown")]
+// pub async fn insert_user_on_auth_callback(
+//     pool: self::PgPool,
+//     u: user::User,
+// ) -> Result<user::User, anyhow::Error> {
+//     if u.email.is_none() {
+//         tracing::error!("Email is now a requied field. you need to promt the user for their email address");
+//         return Err(anyhow::Error::msg("Email is a required field"));
+//     }
+//     let email = u.email.unwrap();
+//     user::User::create_returning_self(pool, &u.auth0_user_id, &u.full_name, &email, u.picture.as_deref(), u.profile.as_deref(), u.username).await
+
+// }
+#[cfg(feature = "not-wasm32-unknown-unknown")]
+pub async fn insert_auth_state_returning_id(
+    connection: &mut PgPooledConnection,
+    auth_state: auth_state::AuthState,
+) -> Result<uuid::Uuid, anyhow::Error> {
+    auth_state.insert_returning_id(connection).await
 }
 
 #[cfg(feature = "not-wasm32-unknown-unknown")]
-pub async fn create_pool(
-    database_url: &str,
-    max_connections: usize,
-) -> Result<PgPool, anyhow::Error> {
-    use diesel_async::{
-        pooled_connection::{deadpool::Pool, AsyncDieselConnectionManager, ManagerConfig},
-        AsyncPgConnection,
-    };
-    tracing::info!("The async backend uses the equivalent of sslmode=verify-full. if you get connection errors, please double check your certificates");
-
-    let mut manager_config: ManagerConfig<AsyncPgConnection> = ManagerConfig::default();
-    manager_config.custom_setup = Box::new(establish_connection);
-    let config = AsyncDieselConnectionManager::<diesel_async::AsyncPgConnection>::new_with_config(
-        database_url,
-        manager_config,
-    );
-
-    let pool = Pool::builder(config).max_size(max_connections).build()?;
-
-    Ok(pool)
+#[allow(unused)]
+pub async fn run_migrations(
+    connection: &mut impl MigrationHarness<diesel::pg::Pg>,
+) -> Result<(), anyhow::Error> {
+    // This will run the necessary migrations.
+    //
+    // See the documentation for `MigrationHarness` for
+    // all available methods.
+    connection
+        .run_pending_migrations(MIGRATIONS)
+        .map(|_| ())
+        .map_err(|e| anyhow::Error::msg(e.to_string()))
 }
+
+#[cfg(feature = "not-wasm32-unknown-unknown")]
+
+pub async fn test_connection(pool: self::PgPool) -> Result<usize, anyhow::Error> {
+    use diesel_async::RunQueryDsl;
+    let mut connection = pool.get().await?;
+    Ok(diesel::sql_query("SELECT TRUE")
+        .execute(&mut connection)
+        .await?)
+}
+pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!();
 #[cfg(feature = "not-wasm32-unknown-unknown")]
 pub fn establish_connection(
     database_url: &str,
@@ -437,13 +402,48 @@ pub fn establish_connection(
     };
     fut.boxed()
 }
+// configures a deafult crypto provider. this function needs to be called once in main();
+pub fn initialize_rustls() {
+    let _ = rustls::crypto::aws_lc_rs::default_provider()
+        .install_default()
+        .ok();
+}
+
+// We are using diesel-async as our backend with diesel as the query builder. tls is provided by rustls,
+// currently the only options are sslmode=none and sslmode-verify-full
+
+pub mod _url;
+pub mod auth_state;
+pub mod schema;
+pub mod session;
+pub mod transactions;
+pub mod user;
+
+#[derive(Clone)]
+pub struct PrimaryDatabasePool(PgPool);
+
+pub struct PrimaryDatabasePoolConnection(PgPooledConnection);
+#[cfg(feature = "wasm32-unknown-unknown")]
+pub type Connection = ();
 
 #[cfg(feature = "not-wasm32-unknown-unknown")]
+pub type Connection = diesel_async::pg::AsyncPgConnection;
 
-pub async fn test_connection(pool: self::PgPool) -> Result<usize, anyhow::Error> {
-    use diesel_async::RunQueryDsl;
-    let mut connection = pool.get().await?;
-    Ok(diesel::sql_query("SELECT TRUE")
-        .execute(&mut connection)
-        .await?)
-}
+#[cfg(feature = "not-wasm32-unknown-unknown")]
+pub type PgPool =
+    diesel_async::pooled_connection::deadpool::Pool<diesel_async::pg::AsyncPgConnection>;
+#[cfg(feature = "wasm32-unknown-unknown")]
+pub type PgPool = ();
+
+#[cfg(feature = "not-wasm32-unknown-unknown")]
+pub type PgPooledConnection =
+    diesel_async::pooled_connection::deadpool::Object<diesel_async::pg::AsyncPgConnection>;
+#[cfg(feature = "wasm32-unknown-unknown")]
+pub type PgPooledConnection = ();
+
+pub use diesel;
+#[cfg(feature = "not-wasm32-unknown-unknown")]
+pub use diesel_async;
+pub use diesel_migrations::{EmbeddedMigrations, MigrationHarness};
+
+use diesel_migrations::embed_migrations;

@@ -1,23 +1,3 @@
-// #[macro_use]
-// use super::window;
-#[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
-pub(crate) static FAILED_TO_GET_WINDOW_OBJECT: &str =
-    "Failed to get the window object. Are we in a browser environment?";
-#[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
-pub(crate) static FAILED_TO_GET_DOCUMENT_OBJECT: &str =
-    "Failed to get the document object from the window object. Are we in a browser environment ";
-#[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
-macro_rules! window {
-    () => {
-        match web_sys::window() {
-            Some(window) => window,
-            None => {
-                tracing::error!("{}", FAILED_TO_GET_WINDOW_OBJECT);
-                return;
-            }
-        }
-    };
-}
 #[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
 macro_rules! document {
     () => {
@@ -30,6 +10,76 @@ macro_rules! document {
         }
     };
 }
+#[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
+macro_rules! window {
+    () => {
+        match web_sys::window() {
+            Some(window) => window,
+            None => {
+                tracing::error!("{}", FAILED_TO_GET_WINDOW_OBJECT);
+                return;
+            }
+        }
+    };
+}
+
+/// called after asking the server to create a challenge response. used to register the challenge with the browser
+/// and ask the user to enter their pin code or use another passkey for this website
+/// WARNING: THIS FUNCTION MAY PANIC IF NOT CALLED IN A BROWSER ENVIRONMENT.
+#[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
+pub(crate) fn register_public_key<Callback>(
+    passkey_state_id: uuid::Uuid,
+    creation_challenge_response: CreationChallengeResponse,
+    callback: Callback,
+) where
+    Callback: FnOnce(Result<(), JsValue>) -> () + 'static,
+{
+    macro_rules! ok_or_return_callback {
+        ($r:expr) => {
+            match $r {
+                Ok(item) => item,
+                Err(e) => {
+                    return callback(Err(e));
+                }
+            }
+        };
+    }
+
+    wasm_bindgen_futures::spawn_local(async move {
+        let credential_creation_options =
+            web_sys::CredentialCreationOptions::from(creation_challenge_response);
+        let window = window!();
+        let init_create_credentials_result = window
+            .navigator()
+            .credentials()
+            .create_with_options(&credential_creation_options);
+        let create_credentials_promise = ok_or_return_callback!(init_create_credentials_result);
+        let public_key_credential_result = JsFuture::from(create_credentials_promise).await;
+        let public_key_credential_value = ok_or_return_callback!(public_key_credential_result);
+        let public_key_credential: web_sys::PublicKeyCredential =
+            web_sys::PublicKeyCredential::from(public_key_credential_value);
+        let register_public_key_credential: RegisterPublicKeyCredential =
+            public_key_credential.into();
+        let body = FinishWebAuthnRegistrationBody {
+            passkey_state_id,
+            public_key_request: register_public_key_credential,
+        };
+        let register_public_key_network_result = super::net::register_webauthn_public_key(body)
+            .await
+            .map_err(|e| JsValue::from_str(&e.to_string()));
+        let register_public_key_response =
+            ok_or_return_callback!(register_public_key_network_result);
+        callback(Ok(register_public_key_response));
+    });
+}
+#[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
+pub(crate) static FAILED_TO_GET_DOCUMENT_OBJECT: &str =
+    "Failed to get the document object from the window object. Are we in a browser environment ";
+// #[macro_use]
+// use super::window;
+#[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
+pub(crate) static FAILED_TO_GET_WINDOW_OBJECT: &str =
+    "Failed to get the window object. Are we in a browser environment?";
 
 #[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
 #[wasm_bindgen::wasm_bindgen(start)]
@@ -94,56 +144,6 @@ pub async fn start_frontend() -> Result<(), wasm_bindgen::JsValue> {
             .hydrate();
     // let mut renderer: Renderer<FrontendApp> = Renderer::with_root(web_sys::Element::from(body_element));
     Ok(())
-}
-
-/// called after asking the server to create a challenge response. used to register the challenge with the browser
-/// and ask the user to enter their pin code or use another passkey for this website
-/// WARNING: THIS FUNCTION MAY PANIC IF NOT CALLED IN A BROWSER ENVIRONMENT.
-#[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
-pub(crate) fn register_public_key<Callback>(
-    passkey_state_id: uuid::Uuid,
-    creation_challenge_response: CreationChallengeResponse,
-    callback: Callback,
-) where
-    Callback: FnOnce(Result<(), JsValue>) -> () + 'static,
-{
-    macro_rules! ok_or_return_callback {
-        ($r:expr) => {
-            match $r {
-                Ok(item) => item,
-                Err(e) => {
-                    return callback(Err(e));
-                }
-            }
-        };
-    }
-
-    wasm_bindgen_futures::spawn_local(async move {
-        let credential_creation_options =
-            web_sys::CredentialCreationOptions::from(creation_challenge_response);
-        let window = window!();
-        let init_create_credentials_result = window
-            .navigator()
-            .credentials()
-            .create_with_options(&credential_creation_options);
-        let create_credentials_promise = ok_or_return_callback!(init_create_credentials_result);
-        let public_key_credential_result = JsFuture::from(create_credentials_promise).await;
-        let public_key_credential_value = ok_or_return_callback!(public_key_credential_result);
-        let public_key_credential: web_sys::PublicKeyCredential =
-            web_sys::PublicKeyCredential::from(public_key_credential_value);
-        let register_public_key_credential: RegisterPublicKeyCredential =
-            public_key_credential.into();
-        let body = FinishWebAuthnRegistrationBody {
-            passkey_state_id,
-            public_key_request: register_public_key_credential,
-        };
-        let register_public_key_network_result = super::net::register_webauthn_public_key(body)
-            .await
-            .map_err(|e| JsValue::from_str(&e.to_string()));
-        let register_public_key_response =
-            ok_or_return_callback!(register_public_key_network_result);
-        callback(Ok(register_public_key_response));
-    });
 }
 
 /// asks the server to generate a credentials challenge response

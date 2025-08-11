@@ -1,24 +1,63 @@
-use std::ffi::CString;
 
-// pub mod bindings;
-pub mod extern_function_definitions;
-pub const RLTD_NOW: std::ffi::c_int = 0x0002;
-pub const LIBRARY_NAME_CSTR: &std::ffi::CStr = c"X11";
+// pub fn x_open_display(path:Option<&str>) -> Result<*mut bindings::_XDisplay,String> {
+//     let cstr = map_str_to_cstring(path);
+//     let s_ptr = map_cstring_or_else_nullpointer(cstr);
 
-pub mod x_proto_from_spec;
+//     let ptr = unsafe {bindings::XOpenDisplay(s_ptr)};
+//     let _ = check_mut_pointer_or_return_error(ptr)?;
 
+//     Ok(ptr)
 
-pub mod sys;
+// }
 
+// pub fn x_close_display(dis: *mut bindings::Display) {
 
+//     todo!()
+// }
 
-unsafe extern "C"{
-    #[link_name = "dlopen"]
-    pub unsafe fn c_dlopen(filename: *const std::ffi::c_char, flags: std::ffi::c_int) -> *mut std::ffi::c_void;
-    #[link_name = "dlsym"]
-    pub unsafe fn c_dlsym(handle: *mut std::ffi::c_void,symbol_name: *const std::ffi::c_char) -> *mut std::ffi::c_void;
-    #[link_name="dlclose"]
-    pub unsafe fn c_dlclose(handle: *mut std::ffi::c_void);
+// pub fn open_x11_shared_object() -> Result<>
+fn check_mut_pointer_or_return_error<T>(ptr: *mut T) -> Result<(), String> {
+    if ptr.is_null() {
+        return Err(format!(
+            "*mut {}: failed null pointer check",
+            std::any::type_name::<T>()
+        ));
+    } else if !ptr.is_aligned() {
+        return Err(format!(
+            "*mut {}: pointer is not aligned!",
+            std::any::type_name::<T>()
+        ));
+    } else if unsafe { ptr.as_ref() }.is_none() {
+        return Err(format!(
+            "*mut {}: pointer is not valid",
+            std::any::type_name::<T>()
+        ));
+    } else {
+        return Ok(());
+    }
+}
+fn map_cstring_or_else_nullpointer(o_cstr: Option<std::ffi::CString>) -> *const std::ffi::c_char {
+    o_cstr.map(|s| s.as_ptr()).unwrap_or(std::ptr::null())
+}
+fn map_option_mut_t_to_mut_pointer<T>(o: Option<&mut T>) -> *const T {
+    o.map(|t| std::ptr::from_ref(t))
+        .unwrap_or(std::ptr::null_mut())
+}
+fn map_option_t_to_const_pointer<T>(o: Option<&T>) -> *const T {
+    o.map(|t| std::ptr::from_ref(t)).unwrap_or(std::ptr::null())
+}
+fn map_str_to_cstring(o_s: Option<&str>) -> Option<std::ffi::CString> {
+    o_s.map(str_to_cstring)
+}
+
+// #[test]
+// pub fn test_display_try_open() {
+//     let disp =  Display::try_open(None).unwrap();
+//     let disp = Display::try_open(Some(":1")).unwrap();
+// }
+
+fn str_to_cstring(s: &str) -> std::ffi::CString {
+    std::ffi::CString::new(s).expect("Valid rust string. NO NULL BYTES")
 }
 
 // #[derive(Debug,thiserror::Error)]
@@ -26,7 +65,6 @@ unsafe extern "C"{
 // enum OpenX11SharedObjectError {
 
 // }
-
 
 // pub struct Display {
 //     inner: *mut bindings::_XDisplay
@@ -57,71 +95,36 @@ macro_rules! call_extern_fn {
             if !ptr.is_aligned() {
                 panic!("Cannot call_extern_fn!() because the module pointer is not aligned");
             }
-            
+
         }
         #[cfg(not(test))] {
             $name($($args),*)
         }
-        
+
     };
 }
+pub const LIBRARY_NAME_CSTR: &std::ffi::CStr = c"X11";
+pub const RLTD_NOW: std::ffi::c_int = 0x0002;
 
+// pub mod bindings;
+pub mod extern_function_definitions;
 
+pub mod sys;
 
-// #[test]
-// pub fn test_display_try_open() {
-//     let disp =  Display::try_open(None).unwrap();
-//     let disp = Display::try_open(Some(":1")).unwrap();
-// }
+pub mod x_proto_from_spec;
 
-
-fn str_to_cstring(s: &str) -> std::ffi::CString {
-    std::ffi::CString::new(s).expect("Valid rust string. NO NULL BYTES")
+unsafe extern "C" {
+    #[link_name = "dlopen"]
+    pub unsafe fn c_dlopen(
+        filename: *const std::ffi::c_char,
+        flags: std::ffi::c_int,
+    ) -> *mut std::ffi::c_void;
+    #[link_name = "dlsym"]
+    pub unsafe fn c_dlsym(
+        handle: *mut std::ffi::c_void,
+        symbol_name: *const std::ffi::c_char,
+    ) -> *mut std::ffi::c_void;
+    #[link_name = "dlclose"]
+    pub unsafe fn c_dlclose(handle: *mut std::ffi::c_void);
 }
-fn map_str_to_cstring(o_s:Option<&str>) -> Option<std::ffi::CString> {
-    o_s.map(str_to_cstring)
-}
-fn map_cstring_or_else_nullpointer(o_cstr: Option<std::ffi::CString>) -> *const std::ffi::c_char {
-    o_cstr.map(|s|s.as_ptr()).unwrap_or(std::ptr::null())
-}
-fn map_option_t_to_const_pointer<T>(o:Option<&T>) -> *const T {
-    o.map(|t|std::ptr::from_ref(t)).unwrap_or(std::ptr::null())
-}
-fn map_option_mut_t_to_mut_pointer<T>(o:Option<&mut T>) -> *const T {
-    o.map(|t | std::ptr::from_ref(t)).unwrap_or(std::ptr::null_mut())
-}
-fn check_mut_pointer_or_return_error<T>(ptr:*mut T) -> Result<(),String> {
-    if ptr.is_null() {
-        return Err(format!("*mut {}: failed null pointer check",std::any::type_name::<T>()))
-    }
-    else if !ptr.is_aligned() {
-        return Err(format!("*mut {}: pointer is not aligned!",std::any::type_name::<T>()));
-    }
-    else if unsafe {ptr.as_ref()}.is_none() {
-        return Err(format!("*mut {}: pointer is not valid",std::any::type_name::<T>()))
-    }
-    else {
-        return Ok(())
-    }
-
-}
-
-// pub fn x_open_display(path:Option<&str>) -> Result<*mut bindings::_XDisplay,String> {
-//     let cstr = map_str_to_cstring(path);
-//     let s_ptr = map_cstring_or_else_nullpointer(cstr);
-
-//     let ptr = unsafe {bindings::XOpenDisplay(s_ptr)};
-//     let _ = check_mut_pointer_or_return_error(ptr)?;
-
-//     Ok(ptr)
-
-// }
-
-// pub fn x_close_display(dis: *mut bindings::Display) {
-
-//     todo!()
-// }
-
-
-
-// pub fn open_x11_shared_object() -> Result<>
+use std::ffi::CString;

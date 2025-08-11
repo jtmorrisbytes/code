@@ -1,70 +1,3 @@
-use serde::{Deserialize, Serialize};
-use time;
-pub const AUTH0_BASE_SCOPES: &'static str = "openid email profile";
-pub const SCOPE_ACCESS_OPS: &'static str = "access:ops";
-pub const SCOPE_READ_OTHERS_DATA: &str = "read:others";
-pub const SCOPE_UPDATE_OTHERS_DATA: &str = "update:others";
-pub const SCOPE_DELETE_OTHERS_DATA: &str = "delete:others";
-pub const SCOPE_CREATE_OTHERS_DATA: &str = "create:others";
-// NOTE: use crate::PrimaryDatabaseConnection instead of rocket_db_pools::Connection<crate::PrimaryDatabase> for tls workaround!
-// use crate::PrimaryDatabase;
-#[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
-#[rocket::get("/")]
-pub async fn render_index() {}
-
-#[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
-pub fn render_error_template(
-    next_uri: &rocket::http::uri::Absolute<'_>,
-    // title: &str,
-    // heading: &str,
-    message: Option<&str>,
-    error: impl std::convert::Into<Box<dyn std::error::Error>>,
-) -> rocket_dyn_templates::Template {
-    let error: Box<dyn std::error::Error> = error.into();
-    rocket_dyn_templates::Template::render(
-        "error",
-        rocket_dyn_templates::context! {
-             next_uri: next_uri.to_string(),
-             title: "Server Error",
-             heading: "Server Error",
-             message:format!("A General Server Error Occurred: {}",message.unwrap_or("No further context was provided")),
-             error: error.to_string()
-        },
-    )
-}
-
-// use sqlx::any;
-
-// use crate::render_error_template;
-
-/// a wrapper struct that 'remembers' how long to delay external authentication requests for
-#[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
-pub struct AuthenticationClientBackoff(pub rocket::tokio::sync::Mutex<u64>);
-#[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
-impl std::default::Default for AuthenticationClientBackoff {
-    fn default() -> Self {
-        AuthenticationClientBackoff(rocket::tokio::sync::Mutex::new(1))
-    }
-}
-
-// Currently authentication is handled by a third party service
-// use crate::AUTH0_APP_BASE_SCOPES as BASE_SCOPE;
-#[derive(Deserialize, Debug, PartialEq)]
-pub struct Claims {
-    pub sub: String,
-    pub email: Option<String>,
-    pub iat: Option<i64>,
-    pub exp: Option<i32>,
-    pub permissions: Vec<String>,
-}
-impl Claims {
-    pub fn expires_utc(&self) -> time::OffsetDateTime {
-        time::OffsetDateTime::from_unix_timestamp(self.exp.unwrap_or(0).into())
-            .expect("Getting an OffsetDateTime from the exp claim should not fail")
-    }
-}
-#[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
-pub struct AccessTokenCookie<'a>(pub rocket::http::Cookie<'a>);
 
 #[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
 impl<'a> AccessTokenCookie<'a> {
@@ -89,20 +22,6 @@ impl<'a> AccessTokenCookie<'a> {
     pub fn inner(self) -> rocket::http::Cookie<'a> {
         self.0
     }
-}
-#[derive(thiserror::Error, Debug)]
-#[error("Access Token Error: {0}")]
-pub enum AccessTokenRequestError {
-    #[error("Access token cookie not present in cookie jar")]
-    CookieNotPresent,
-    #[error("Authentication client is not available in rocket state. Make sure you have configured server correctly!")]
-    AuthenticationClientNotAvailable,
-    #[error("Failed to verify access token: {underlying_error}")]
-    FailedToVerifyAccessToken { underlying_error: String },
-    #[error("An error occurred while trying to get an OffsetDateTime from the expiry claims from a provided access token: {underlying_error}")]
-    FailedToParseOffsetDateTimeFromAccessToken { underlying_error: String },
-    #[error("Token Expired")]
-    AccessTokenExpired,
 }
 #[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
 #[rocket::async_trait]
@@ -168,11 +87,6 @@ impl<'r> rocket::request::FromRequest<'r> for AccessToken {
         rocket::request::Outcome::Success(Self(token))
     }
 }
-#[derive(Debug)]
-pub struct AccessToken(
-    auth0::AccessToken<Claims>,
-    // expires: time::OffsetDateTime
-);
 impl AccessToken {
     pub fn claims(&self) -> &Claims {
         self.0.claims()
@@ -192,27 +106,11 @@ impl AccessToken {
         &self.0
     }
 }
-
-/// retains some information used while authenticating a request
-#[derive(Serialize, Deserialize, PartialEq, Clone, Debug)]
-pub struct AuthenticationState {
-    pub id: uuid::Uuid,
-    pub started: time::OffsetDateTime,
-    pub return_url: Option<String>,
-    pub redirect_url: String,
-    pub scope: String,
-}
-// pub fn parse_url
-#[derive(serde::Deserialize)]
-pub struct UserInfo {
-    name: String,
-    given_name: Option<String>,
-    family_name: Option<String>,
-    profile: Option<String>,
-    picture: Option<String>,
-    email: Option<String>,
-    phone_number: Option<String>,
-    locale: Option<String>,
+impl Claims {
+    pub fn expires_utc(&self) -> time::OffsetDateTime {
+        time::OffsetDateTime::from_unix_timestamp(self.exp.unwrap_or(0).into())
+            .expect("Getting an OffsetDateTime from the exp claim should not fail")
+    }
 }
 impl UserInfo {
     pub fn full_name(&self) -> &str {
@@ -239,6 +137,75 @@ impl UserInfo {
     pub fn locale(&self) -> Option<&str> {
         self.locale.as_deref()
     }
+}
+#[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
+impl std::default::Default for AuthenticationClientBackoff {
+    fn default() -> Self {
+        AuthenticationClientBackoff(rocket::tokio::sync::Mutex::new(1))
+    }
+}
+
+#[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
+#[rocket::get("/authorize?<scope>&<return_url>", format = "text/html")]
+pub async fn authorize(
+    // NOTE: use crate::PrimaryDatabaseConnection instead of rocket_db_pools::Connection<crate::PrimaryDatabase> for tls workaround!
+    pool: super::db::PrimaryDatabasePool,
+    public_base_uri: super::RocketAbsoluteBaseUri,
+    server_config: &rocket::State<super::config::ServerConfig>,
+    authentication_client_backoff: &rocket::State<AuthenticationClientBackoff>,
+    authentication_client: &rocket::State<auth0::AuthenticationClient>,
+    scope: Option<String>,
+    return_url: Option<crate::web_server::url::Url>,
+    // audience: String,
+) -> Result<rocket::response::Redirect, super::response::HtmlResponse> {
+    let scope = scope.unwrap_or(AUTH0_BASE_SCOPES.to_string());
+    let index_uri = rocket::uri!((*public_base_uri).to_owned(), super::render_index());
+    let return_uri = return_url
+        .as_deref()
+        .map(|s: &url::Url| {
+            rocket::http::uri::Absolute::<'_>::parse(s.as_str())
+                .unwrap_or_else(|_| index_uri.clone())
+        })
+        .unwrap_or_else(|| index_uri.clone());
+    // url unwrap_or_else go to the main page
+    if public_base_uri.authority().as_ref().unwrap() != return_uri.authority().as_ref().unwrap() {
+        return Err(super::response::HtmlResponse::bad_request(super::response::BadRequestError{error:"The server recived a request to redirect to an external website which is not supported.".to_string(),return_uri:index_uri.to_string()}));
+    }
+
+    let callback_url = rocket::uri!(
+        (*public_base_uri).to_owned(),
+        self::handle_auth_callback(
+            Option::<uuid::Uuid>::None,
+            Option::<String>::None,
+            Option::<String>::None,
+            Option::<String>::None
+        )
+    );
+    let callback_url = url::Url::parse(&callback_url.to_string()).map_err(|e| {
+        anyhow::Error::new(e)
+            .context("while attempting to parse a callback url during a call to authorize")
+    })?;
+    let auth_state =
+        super::db::auth_state::AuthState::new(return_url.as_deref(), scope.as_str(), &callback_url);
+
+    let mut connection = pool.get().await.map_err(|e| anyhow::Error::new(e))?;
+    let _ = auth_state.insert(&mut connection).await?;
+    // let auth_state_uuid_create_result =
+    let options = auth0::StartLoginWithRedirectOptions {
+        scope: &scope,
+        redirect_uri: callback_url.as_str(),
+        audience: server_config.auth0_audience(),
+        state: &auth_state.id.to_string(),
+        connection: "",
+        additional_parameters: Default::default(),
+    };
+    let next_url = authentication_client
+        .start_login_with_redirect(
+            &options,
+            authentication_client_backoff.0.lock().await.clone(),
+        )
+        .map_err(|e| e.context("While attempting to generate a redirect url to auth0."))?;
+    Ok(rocket::response::Redirect::to(next_url.to_string()))
 }
 
 #[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
@@ -357,73 +324,56 @@ pub async fn handle_auth_callback<'r>(
         .unwrap_or(rocket::uri!(super::render_index()).to_string());
     Ok(rocket::response::Redirect::to(return_url))
 }
-
+// NOTE: use crate::PrimaryDatabaseConnection instead of rocket_db_pools::Connection<crate::PrimaryDatabase> for tls workaround!
+// use crate::PrimaryDatabase;
 #[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
-#[rocket::get("/authorize?<scope>&<return_url>", format = "text/html")]
-pub async fn authorize(
-    // NOTE: use crate::PrimaryDatabaseConnection instead of rocket_db_pools::Connection<crate::PrimaryDatabase> for tls workaround!
-    pool: super::db::PrimaryDatabasePool,
-    public_base_uri: super::RocketAbsoluteBaseUri,
-    server_config: &rocket::State<super::config::ServerConfig>,
-    authentication_client_backoff: &rocket::State<AuthenticationClientBackoff>,
-    authentication_client: &rocket::State<auth0::AuthenticationClient>,
-    scope: Option<String>,
-    return_url: Option<crate::web_server::url::Url>,
-    // audience: String,
-) -> Result<rocket::response::Redirect, super::response::HtmlResponse> {
-    let scope = scope.unwrap_or(AUTH0_BASE_SCOPES.to_string());
-    let index_uri = rocket::uri!((*public_base_uri).to_owned(), super::render_index());
-    let return_uri = return_url
-        .as_deref()
-        .map(|s: &url::Url| {
-            rocket::http::uri::Absolute::<'_>::parse(s.as_str())
-                .unwrap_or_else(|_| index_uri.clone())
-        })
-        .unwrap_or_else(|| index_uri.clone());
-    // url unwrap_or_else go to the main page
-    if public_base_uri.authority().as_ref().unwrap() != return_uri.authority().as_ref().unwrap() {
-        return Err(super::response::HtmlResponse::bad_request(super::response::BadRequestError{error:"The server recived a request to redirect to an external website which is not supported.".to_string(),return_uri:index_uri.to_string()}));
-    }
-
-    let callback_url = rocket::uri!(
-        (*public_base_uri).to_owned(),
-        self::handle_auth_callback(
-            Option::<uuid::Uuid>::None,
-            Option::<String>::None,
-            Option::<String>::None,
-            Option::<String>::None
-        )
-    );
-    let callback_url = url::Url::parse(&callback_url.to_string()).map_err(|e| {
-        anyhow::Error::new(e)
-            .context("while attempting to parse a callback url during a call to authorize")
-    })?;
-    let auth_state =
-        super::db::auth_state::AuthState::new(return_url.as_deref(), scope.as_str(), &callback_url);
-
-    let mut connection = pool.get().await.map_err(|e| anyhow::Error::new(e))?;
-    let _ = auth_state.insert(&mut connection).await?;
-    // let auth_state_uuid_create_result =
-    let options = auth0::StartLoginWithRedirectOptions {
-        scope: &scope,
-        redirect_uri: callback_url.as_str(),
-        audience: server_config.auth0_audience(),
-        state: &auth_state.id.to_string(),
-        connection: "",
-        additional_parameters: Default::default(),
-    };
-    let next_url = authentication_client
-        .start_login_with_redirect(
-            &options,
-            authentication_client_backoff.0.lock().await.clone(),
-        )
-        .map_err(|e| e.context("While attempting to generate a redirect url to auth0."))?;
-    Ok(rocket::response::Redirect::to(next_url.to_string()))
+#[rocket::get("/")]
+pub async fn render_index() {}
+pub const AUTH0_BASE_SCOPES: &'static str = "openid email profile";
+pub const SCOPE_ACCESS_OPS: &'static str = "access:ops";
+pub const SCOPE_CREATE_OTHERS_DATA: &str = "create:others";
+pub const SCOPE_DELETE_OTHERS_DATA: &str = "delete:others";
+pub const SCOPE_READ_OTHERS_DATA: &str = "read:others";
+pub const SCOPE_UPDATE_OTHERS_DATA: &str = "update:others";
+#[derive(thiserror::Error, Debug)]
+#[error("Access Token Error: {0}")]
+pub enum AccessTokenRequestError {
+    #[error("Access token cookie not present in cookie jar")]
+    CookieNotPresent,
+    #[error("Authentication client is not available in rocket state. Make sure you have configured server correctly!")]
+    AuthenticationClientNotAvailable,
+    #[error("Failed to verify access token: {underlying_error}")]
+    FailedToVerifyAccessToken { underlying_error: String },
+    #[error("An error occurred while trying to get an OffsetDateTime from the expiry claims from a provided access token: {underlying_error}")]
+    FailedToParseOffsetDateTimeFromAccessToken { underlying_error: String },
+    #[error("Token Expired")]
+    AccessTokenExpired,
 }
 #[rocket::post("/auth/logout")]
 pub fn logout(cookie_jar: &rocket::http::CookieJar<'_>) -> rocket::response::Redirect {
     cookie_jar.remove_private("access_token");
     rocket::response::Redirect::to(rocket::uri!(super::render_index()))
+}
+
+#[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
+pub fn render_error_template(
+    next_uri: &rocket::http::uri::Absolute<'_>,
+    // title: &str,
+    // heading: &str,
+    message: Option<&str>,
+    error: impl std::convert::Into<Box<dyn std::error::Error>>,
+) -> rocket_dyn_templates::Template {
+    let error: Box<dyn std::error::Error> = error.into();
+    rocket_dyn_templates::Template::render(
+        "error",
+        rocket_dyn_templates::context! {
+             next_uri: next_uri.to_string(),
+             title: "Server Error",
+             heading: "Server Error",
+             message:format!("A General Server Error Occurred: {}",message.unwrap_or("No further context was provided")),
+             error: error.to_string()
+        },
+    )
 }
 
 pub fn routes() -> Vec<rocket::route::Route> {
@@ -496,3 +446,53 @@ pub mod tests {
         Ok::<(), Box<dyn std::error::Error>>(())
     }
 }
+#[derive(Debug)]
+pub struct AccessToken(
+    auth0::AccessToken<Claims>,
+    // expires: time::OffsetDateTime
+);
+#[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
+pub struct AccessTokenCookie<'a>(pub rocket::http::Cookie<'a>);
+
+// use sqlx::any;
+
+// use crate::render_error_template;
+
+/// a wrapper struct that 'remembers' how long to delay external authentication requests for
+#[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
+pub struct AuthenticationClientBackoff(pub rocket::tokio::sync::Mutex<u64>);
+
+/// retains some information used while authenticating a request
+#[derive(Serialize, Deserialize, PartialEq, Clone, Debug)]
+pub struct AuthenticationState {
+    pub id: uuid::Uuid,
+    pub started: time::OffsetDateTime,
+    pub return_url: Option<String>,
+    pub redirect_url: String,
+    pub scope: String,
+}
+
+// Currently authentication is handled by a third party service
+// use crate::AUTH0_APP_BASE_SCOPES as BASE_SCOPE;
+#[derive(Deserialize, Debug, PartialEq)]
+pub struct Claims {
+    pub sub: String,
+    pub email: Option<String>,
+    pub iat: Option<i64>,
+    pub exp: Option<i32>,
+    pub permissions: Vec<String>,
+}
+// pub fn parse_url
+#[derive(serde::Deserialize)]
+pub struct UserInfo {
+    name: String,
+    given_name: Option<String>,
+    family_name: Option<String>,
+    profile: Option<String>,
+    picture: Option<String>,
+    email: Option<String>,
+    phone_number: Option<String>,
+    locale: Option<String>,
+}
+use serde::{Deserialize, Serialize};
+use time;

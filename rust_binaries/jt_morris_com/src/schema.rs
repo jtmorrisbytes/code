@@ -1,3 +1,21 @@
+
+diesel::allow_tables_to_appear_in_same_query!(
+    _sqlx_migrations,
+    auth_state,
+    sessions,
+    transactions,
+    transactions_items,
+    transactions_items_categories,
+    transactions_items_users,
+    users,
+    vehicles,
+);
+
+diesel::joinable!(transactions -> users (user_id));
+diesel::joinable!(transactions_items -> transactions (transaction_id));
+diesel::joinable!(transactions_items_categories -> transactions_items (transaction_item_id));
+diesel::joinable!(transactions_items_users -> transactions_items (transactions_item_id));
+diesel::joinable!(transactions_items_users -> users (user_id));
 // @generated automatically by Diesel CLI.
 
 diesel::table! {
@@ -87,21 +105,3 @@ diesel::table! {
         year -> Text,
     }
 }
-
-diesel::joinable!(transactions -> users (user_id));
-diesel::joinable!(transactions_items -> transactions (transaction_id));
-diesel::joinable!(transactions_items_categories -> transactions_items (transaction_item_id));
-diesel::joinable!(transactions_items_users -> transactions_items (transactions_item_id));
-diesel::joinable!(transactions_items_users -> users (user_id));
-
-diesel::allow_tables_to_appear_in_same_query!(
-    _sqlx_migrations,
-    auth_state,
-    sessions,
-    transactions,
-    transactions_items,
-    transactions_items_categories,
-    transactions_items_users,
-    users,
-    vehicles,
-);

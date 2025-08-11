@@ -1,11 +1,3 @@
-use super::camera::Camera;
-use super::actor::Actor;
-// a structure that contains all of the objects or entites in the 'world'
-pub struct Scene {
-    last_created_actor_id: u32,
-    actors: std::collections::BTreeMap<u32,Box<dyn Actor>>,
-    camera: Camera,
-}
 impl Scene {
     pub const fn origin() -> glam::Vec3 {
         glam::Vec3 {
@@ -37,4 +29,11 @@ impl Scene {
     pub fn camera_mut<'b,'a:'b>(&'a mut self) -> &'b mut Camera {
         &mut self.camera
     }
+}// a structure that contains all of the objects or entites in the 'world'
+pub struct Scene {
+    last_created_actor_id: u32,
+    actors: std::collections::BTreeMap<u32,Box<dyn Actor>>,
+    camera: Camera,
 }
+use super::actor::Actor;
+use super::camera::Camera;

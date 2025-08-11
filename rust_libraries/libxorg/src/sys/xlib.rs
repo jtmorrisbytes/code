@@ -24,7 +24,6 @@
 
 // */
 
-
 // /*
 //  *	Xlib.h - Header definition and support file for the C subroutine
 //  *	interface library (Xlib) to the X Window System Protocol (V11).
@@ -82,7 +81,6 @@
 // pub const QueuedAlready:int =  0;
 // pub const QueuedAfterReading:int =  1;
 // pub const QueuedAfterFlush:int =  2;
-
 
 // macro_rules! ConnectionNumber{
 //     ($dpy) =>{($dpy as _XPrivDisplay).fd}
@@ -150,7 +148,7 @@
 // #[repr(C)]
 //  pub(crate) struct _XExtData {
 //     ///number returned by XRegisterExtension
-// 	number: int,		
+// 	number: int,
 // 	// struct _XExtData *next;
 //     next: *mut _XExtData,
 //     free_private: unsafe extern "C" fn(extension:*mut _XExtData) -> int,	/* next item on list of data for structure */
@@ -182,7 +180,6 @@
 //     bits_per_pixel:int,
 //     scanline_pad:int,
 // }
-
 
 // /*
 //  * Data structure for setting graphics context.
@@ -236,7 +233,6 @@
 // /// the public type to _XGC
 // pub type GC = *mut _XGC;
 
-
 // /*
 //  * Visual structure; contains information about colormapping possible.
 //  */
@@ -271,12 +267,10 @@
 //  * implementation dependent.  A Screen should be treated as opaque
 //  * by application code.
 //  */
-
 // pub (crate) struct _XDisplay;		/* Forward declare before use for C++ */
-
 // pub struct Screen {
 //     ///hook for extension to hang data
-// 	ext_data: *mut XExtData,	
+// 	ext_data: *mut XExtData,
 // 	//back pointer to display structure
 //     display: *const _XDisplay,
 // 	///Root window id
@@ -284,10 +278,10 @@
 //     /// width of screen
 //     width:int,
 //     /// height of screen
-//     height:int,	
-//     /// width of screen in millimeters	
+//     height:int,
+//     /// width of screen in millimeters
 // 	mwidth: int,
-//     /// height of screen in millimeters 
+//     /// height of screen in millimeters
 //     mheight: int,
 //     /// number of depths possible
 // 	ndepths:int,
@@ -304,9 +298,9 @@
 // 	white_pixel:u_long,
 //     ///White and Black pixel values
 //     black_pixel:u_long,
-//     ///max and min color maps 
+//     ///max and min color maps
 //     max_maps:int,
-//     ///max and min color maps 
+//     ///max and min color maps
 //     min_maps:int,	backing_store:int,	/* Never, WhenMapped, Always */
 // 	save_unders: Bool,
 // 	root_input_mask: long,	/* initial root input mask */
@@ -358,11 +352,11 @@
 // }
 
 // typedef struct {
-//     ///location of window 
+//     ///location of window
 //     x:int,
-//     ///location of window 
+//     ///location of window
 //     y:int,
-//         ///width and height of window 
+//         ///width and height of window
 //      width:int,
 //     height:int,
 //     ///border width of window
@@ -400,7 +394,6 @@
 //  * Data structure for host setting; getting routines.
 //  *
 //  */
-
 //  #[repr(C)]
 // pub struct XHostAddress {
 //     ///for example FamilyInternet
@@ -419,9 +412,7 @@
 // 	value: *mut char,		/* pointer to where to find the address */
 // }
 
-
-
-// type _PFN_XImageFuncs_CreateImage = Option<unsafe extern "C" fn(*mut _XDisplay,*mut Visual, u_int,int,int,*const char,u_int,u_int,int) -> *mut _XImage>; 
+// type _PFN_XImageFuncs_CreateImage = Option<unsafe extern "C" fn(*mut _XDisplay,*mut Visual, u_int,int,int,*const char,u_int,u_int,int) -> *mut _XImage>;
 // type _PFN_XImageFuncs_DestroyImage = Option<unsafe extern "C" fn(*mut _XImage) -> int>;
 // type _PFN_XImageFuncs_GetPixel = Option<unsafe extern "C" fn(*mut _Ximage, int,int)-> u_long>;
 // type _PFN_XImageFuncs_PutPixel = Option<unsafe extern "C" fn(*mut _Ximage, int,int, u_int)->int>;
@@ -437,15 +428,14 @@
 //     add_pixel: _PFN_XImageFuncs_AddPixel
 // }
 
-
 // /*
 //  * Data structure for "image" data, used by image manipulation routines.
 //  */
 // #[repr(C)]
 //  struct _XImage {
-//     ///size of image 
+//     ///size of image
 //     width:int,
-//     ///size of image 
+//     ///size of image
 //     height:int,    ///number of pixels offset in X direction
 //     xoffset:int,
 //     format:int,			/* XYBitmap, XYPixmap, ZPixmap */
@@ -529,9 +519,7 @@
 //     short angle1, angle2;
 // }
 
-
 // /* Data structure for XChangeKeyboardControl */
-
 // typedef struct {
 //         key_click_percent:int,
 //         bell_percent:int,
@@ -544,7 +532,6 @@
 // }
 
 // /* Data structure for XGetKeyboardControl */
-
 // typedef struct {
 //         key_click_percent:int,
 // 	bell_percent:int,
@@ -555,19 +542,16 @@
 // }
 
 // /* Data structure for XGetMotionEvents.  */
-
 // typedef struct {
 //         time: Time,
 // 	short x, y;
 // }
 
 // /* Data structure for X{Set,Get}ModifierMapping */
-
 // typedef struct {
 //  	max_keypermod:int,	/* The server's max # of keys per modifier */
 //  	modifiermap: *mut KeyCode,	/* An 8 by max_keypermod array of modifiers */
 // }
-
 
 // /*
 //  * Display datatype maintaining display specific data.
@@ -668,9 +652,9 @@
 // 	subwindow: Window,	/* child window */
 // 	time: Time,		/* milliseconds */
 // 	int x, y;		/* pointer x, y coordinates in event window */
-//     ///coordinates relative to root 
+//     ///coordinates relative to root
 //     x_root:int,
-//     ///coordinates relative to root 
+//     ///coordinates relative to root
 //     y_root:int,
 //     state: u_int,	/* key or button mask */
 // 	keycode: u_int,	/* detail */
@@ -690,7 +674,7 @@
 // 	subwindow: Window,	/* child window */
 // 	time: Time,		/* milliseconds */
 // 	int x, y;		/* pointer x, y coordinates in event window */
-// 	    ///coordinates relative to root 
+// 	    ///coordinates relative to root
 //      x_root:int,
 //     y_root:int,
 // 	state: u_int,	/* key or button mask */
@@ -711,7 +695,7 @@
 // 	subwindow: Window,	/* child window */
 // 	time: Time,		/* milliseconds */
 // 	int x, y;		/* pointer x, y coordinates in event window */
-// 	    ///coordinates relative to root 
+// 	    ///coordinates relative to root
 //      x_root:int,
 //     y_root:int,
 // 	state: u_int,	/* key or button mask */
@@ -732,7 +716,7 @@
 // 	subwindow: Window,	/* child window */
 // 	time: Time,		/* milliseconds */
 // 	int x, y;		/* pointer x, y coordinates in event window */
-// 	    ///coordinates relative to root 
+// 	    ///coordinates relative to root
 //      x_root:int,
 //     y_root:int,
 // 	mode:int,		/* NotifyNormal, NotifyGrab, NotifyUngrab */
@@ -832,10 +816,10 @@
 // 	display: *mut Display,	/* Display the event was read from */
 // 	parent: Window,		/* parent of the window */
 // 	window: Window,		/* window id of window created */
-// 	    ///window location 
+// 	    ///window location
 //      x:int,
 //     y:int,
-// 	    ///size of window 
+// 	    ///size of window
 //      width:int,
 //     height:int,
 //     ///border width
@@ -1069,12 +1053,10 @@
 // 	window: Window,	/* window on which event was requested in event mask */
 // }
 
-
 // /***************************************************************
 //  *
 //  * GenericEvent.  This event is the standard event for all newer extensions.
 //  */
-
 // typedef struct
 //     {
 //     type: int,         /* of event. Always GenericEvent */
@@ -1207,7 +1189,6 @@
 //     font:Font,			/* font to print it in, None don't change */
 // }
 
-
 // typedef union { Display *display;
 // 		gc: GC,
 // 		visual: *mut Visual,
@@ -1223,7 +1204,6 @@
 // /* unused:
 // typedef void (*XOMProc)();
 //  */
-
 // typedef struct _XOM *XOM;
 // typedef struct _XOC *XOC, *XFontSet;
 
@@ -1544,7 +1524,6 @@
 //     Display*		/* display */,
 //     XID			/* font_ID */
 // );
-
 
 // extern XTimeCoord *XGetMotionEvents(
 //     Display*		/* display */,
@@ -1874,7 +1853,6 @@
 // );
 
 // /* multithread routines */
-
 // extern Status XInitThreads(
 //     void
 // );
@@ -1892,7 +1870,6 @@
 // );
 
 // /* routines for dealing with extensions */
-
 // extern XExtCodes *XInitExtension(
 //     Display*		/* display */,
 //     _Xconst char*	/* name */
@@ -1997,7 +1974,6 @@
 //     XErrorHandler	/* handler */
 // );
 
-
 // typedef int (*XIOErrorHandler) (    /* WARNING, this type not in Xlib spec */
 //     Display*		/* display */
 // );
@@ -2087,7 +2063,6 @@
 // );
 
 // /* The following are given in alphabetical order */
-
 // extern int XActivateScreenSaver(
 //     Display*		/* display */
 // );
@@ -2419,7 +2394,6 @@
 // extern int XDisableAccessControl(
 //     Display*		/* display */
 // );
-
 
 // extern int XDisplayCells(
 //     Display*		/* display */,
@@ -3051,7 +3025,6 @@
 // extern int XProtocolVersion(
 //     Display*		/* display */
 // );
-
 
 // extern int XPutBackEvent(
 //     Display*		/* display */,
@@ -4085,7 +4058,6 @@
 // ) _X_SENTINEL(0);
 
 // /* internal connections for IMs */
-
 // extern Bool XRegisterIMInstantiateCallback(
 //     Display*			/* dpy */,
 //     struct _XrmHashBucketRec*	/* rdb */,
@@ -4111,7 +4083,6 @@
 //     Bool			/* opening */,	 /* open or close flag */
 //     XPointer*			/* watch_data */ /* open sets, close uses */
 // );
-
 
 // extern Status XInternalConnectionNumbers(
 //     Display*			/* dpy */,

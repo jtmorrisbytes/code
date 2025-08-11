@@ -1,11 +1,10 @@
-use std::fmt::format;
-
-use gl_generator::{Api, Fallbacks, Profile, Registry, StructGenerator};
 fn main() {
     let mut args = std::env::args();
     let root_path = args.nth(1).expect("File path as first argument to program");
     let root_path = std::path::PathBuf::from(root_path);
-    root_path.canonicalize().expect("Valid file path as first argument");
+    root_path
+        .canonicalize()
+        .expect("Valid file path as first argument");
 
     dbg!(&root_path);
 
@@ -140,16 +139,17 @@ fn main() {
     }
 
     let mut wgl_file = std::fs::File::options()
-            .create(true)
-            .write(true)
-            .truncate(true)
-            .open(bindings_dir_path.join("wgl.rs"))
-            .unwrap();
-    let wgl_registry = Registry::new(Api::Wgl, (1,0), Profile::Compatibility, Fallbacks::All, []);
-    
-    wgl_registry.write_bindings(StructGenerator, &mut wgl_file).unwrap();
-    bindings_root_mod_rs= bindings_root_mod_rs + "pub mod wgl;\n";
+        .create(true)
+        .write(true)
+        .truncate(true)
+        .open(bindings_dir_path.join("wgl.rs"))
+        .unwrap();
+    let wgl_registry = Registry::new(Api::Wgl, (1, 0), Profile::Compatibility, Fallbacks::All, []);
 
+    wgl_registry
+        .write_bindings(StructGenerator, &mut wgl_file)
+        .unwrap();
+    bindings_root_mod_rs = bindings_root_mod_rs + "pub mod wgl;\n";
 
     // GLX 1.0 - 1.4
     let glx_dir = bindings_dir_path.join("glx");
@@ -166,10 +166,12 @@ fn main() {
             (1, minor_version),
             Profile::Compatibility,
             Fallbacks::All,
-            [
-            ],
+            [],
         );
         registry.write_bindings(StructGenerator, &mut file).unwrap();
     }
     std::fs::write(gl_bindings_dir.join("mod.rs"), bindings_root_mod_rs).ok();
 }
+
+use gl_generator::{Api, Fallbacks, Profile, Registry, StructGenerator};
+use std::fmt::format;

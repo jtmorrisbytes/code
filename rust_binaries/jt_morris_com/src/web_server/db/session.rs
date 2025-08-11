@@ -1,16 +1,11 @@
 
-use time;
-// use chrono::Utc;
-
-
-#[derive(Clone)]
-#[cfg_attr(not(all(target_arch="wasm32",target_os="unknown")),derive(diesel::Queryable,diesel::Selectable,diesel::Insertable,diesel::AsChangeset))]
-#[cfg_attr(not(all(target_arch="wasm32",target_os="unknown")),diesel(table_name=super::schema::sessions))]
-
-pub struct Session {
-    id: i64,
-    expires: time::OffsetDateTime,
-    data: serde_json::Value,
+impl Session {
+pub fn id(&self) -> i64 {
+    self.id
+}
+pub fn expires(&self) -> time::OffsetDateTime {
+    self.expires
+}
 }
 #[cfg(not(all(target_arch="wasm32",target_os="unknown")))]
 impl Session {
@@ -142,14 +137,6 @@ impl Session {
         // let mut o = self.data.as_object().map(|o|o.to_owned()).unwrap_or(serde_json::Map::new());
     }
 }
-impl Session {
-pub fn id(&self) -> i64 {
-    self.id
-}
-pub fn expires(&self) -> time::OffsetDateTime {
-    self.expires
-}
-}
 // SESSION
 #[derive(thiserror::Error, Debug)]
 #[error("Session Error: {0}")]
@@ -167,4 +154,17 @@ pub enum SessionError {
     #[error("Session cookie not found")]
     CookieNotFound,
 }
+// use chrono::Utc;
 
+
+#[derive(Clone)]
+#[cfg_attr(not(all(target_arch="wasm32",target_os="unknown")),derive(diesel::Queryable,diesel::Selectable,diesel::Insertable,diesel::AsChangeset))]
+#[cfg_attr(not(all(target_arch="wasm32",target_os="unknown")),diesel(table_name=super::schema::sessions))]
+
+pub struct Session {
+    id: i64,
+    expires: time::OffsetDateTime,
+    data: serde_json::Value,
+}
+
+use time;

@@ -1,28 +1,3 @@
-/// a struct repesenting the database with the name 'primary'
-
-#[cfg_attr(feature = "serialize", derive(serde::Serialize))]
-#[cfg_attr(feature = "deserialize", derive(serde::Deserialize))]
-#[cfg_attr(
-    not(all(target_arch = "wasm32", target_os = "unknown")),
-    derive(diesel::AsExpression)
-)]
-#[cfg_attr(not(all(target_arch="wasm32",target_os="unknown")),diesel(sql_type=diesel::sql_types::Text))]
-// #[cfg_attr(feature="debug", derive(Debug))]
-#[derive(Clone, PartialEq, Debug, Eq)]
-pub struct Url(pub(crate) url::Url);
-impl std::convert::From<url::Url> for self::Url {
-    fn from(value: url::Url) -> Self {
-        Self(value)
-    }
-}
-// when you pass a string as a parameter to the url, it will attempt to decode the url before parsing it
-
-impl std::ops::Deref for self::Url {
-    type Target = url::Url;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
 impl AsRef<url::Url> for self::Url {
     fn as_ref(&self) -> &url::Url {
         &self.0
@@ -52,3 +27,28 @@ impl diesel::serialize::ToSql<diesel::sql_types::Text, diesel::pg::Pg> for self:
         )
     }
 }
+impl std::convert::From<url::Url> for self::Url {
+    fn from(value: url::Url) -> Self {
+        Self(value)
+    }
+}
+// when you pass a string as a parameter to the url, it will attempt to decode the url before parsing it
+
+impl std::ops::Deref for self::Url {
+    type Target = url::Url;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+/// a struct repesenting the database with the name 'primary'
+
+#[cfg_attr(feature = "serialize", derive(serde::Serialize))]
+#[cfg_attr(feature = "deserialize", derive(serde::Deserialize))]
+#[cfg_attr(
+    not(all(target_arch = "wasm32", target_os = "unknown")),
+    derive(diesel::AsExpression)
+)]
+#[cfg_attr(not(all(target_arch="wasm32",target_os="unknown")),diesel(sql_type=diesel::sql_types::Text))]
+// #[cfg_attr(feature="debug", derive(Debug))]
+#[derive(Clone, PartialEq, Debug, Eq)]
+pub struct Url(pub(crate) url::Url);

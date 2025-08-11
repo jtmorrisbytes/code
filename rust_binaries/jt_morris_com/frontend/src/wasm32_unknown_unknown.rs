@@ -1,5 +1,3 @@
-use wasm_bindgen::prelude::*;
-use crate::{FrontendApp,FrontendAppProperties,Route};
 
 #[wasm_bindgen::prelude::wasm_bindgen(start)]
 #[no_mangle]
@@ -53,3 +51,5 @@ pub async fn start() -> Result<(), wasm_bindgen::JsValue> {
     renderer.hydrate();
     Ok(())
 }
+use crate::{FrontendApp,FrontendAppProperties,Route};
+use wasm_bindgen::prelude::*;

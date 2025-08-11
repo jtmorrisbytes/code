@@ -1,93 +1,60 @@
-pub mod protocol;
-use std::io::{BufRead, Bytes, Cursor, Read, Write};
-use std::net::{Ipv4Addr, UdpSocket, Ipv6Addr};
-pub use anyhow::Result as LibDNSResult;
-pub use anyhow::Error as LibDNSError;
-use anyhow::Context;
-pub const DEFAULT_IO_BUFFER_BYTE_COUNT: usize = 1024;
-type IoBuffer<const SIZE: usize = DEFAULT_IO_BUFFER_BYTE_COUNT> = [u8; SIZE];
+const AA_BITFLAG: u16 = 0b0000010000000000;
+const AD_BITFLAG: u16 = 0b0000000000100000;
+const BOOLEAN_BITFLAG: u16 = 0b0000000000000001;
+const CD_BITFLAG: u16 = 0b0000000000010000;
+const OPCODE_BITFLAG: u16 = 0b0111100000000000;
 
+// Bit order for flags left -> right
+const QR_BITFLAG: u16 = 0b1000000000000000;
+const RA_BITFLAG: u16 = 0b0000000010000000;
+const RCODE_BITFLAG: u16 = 0b0000000000001111;
+const RD_BITFLAG: u16 = 0b0000000100000000;
+const TC_BITFLAG: u16 = 0b0000001000000000;
+const Z_BITFLAG: u16 = 0b0000000001000000;
 
-pub fn read_vector_of_bytes<T: AsRef<[u8]>>(size:usize,cursor: &mut std::io::Cursor<T>) -> self::LibDNSResult<Vec<u8>> {
-    let mut buf = vec![0_u8;size];
-    let err = format!("Failed to read {size} bytes from the cursor into the buffer");
-    cursor.read_exact(&mut buf).context(err)?;
-    Ok(buf)
-}
-
-
-
-pub fn read_byte_array<const BYTECOUNT: usize, T:AsRef<[u8]>>(
-    cursor: &mut std::io::Cursor<T>,
-) -> self::LibDNSResult<[u8;BYTECOUNT]> {
-    let mut buf: [u8;BYTECOUNT] = [0_u8;BYTECOUNT];
-    cursor
-        .read_exact(&mut buf)
-        .context("Failed to read {BYTECOUNT} bytes into an array".to_string())?;
-    Ok(buf)
-}
-
-// parser / network helper functions
-pub fn read_u16_from_cursor_as_be<T: AsRef<[u8]>>(
-    cursor: &mut std::io::Cursor<T>,
-) -> self::LibDNSResult<u16> {
-    const SIZE: usize = std::mem::size_of::<u16>() / std::mem::size_of::<u8>();
-    let bytes: [u8; SIZE] = read_byte_array(cursor)
-        .context("Failed to get byte array from cursor for u16 be".to_string())?;
-    Ok(u16::from_be_bytes(bytes))
-}
-pub fn read_u8_from_cursor<T: AsRef<[u8]>>(
-    cursor: &mut std::io::Cursor<T>,
-) -> self::LibDNSResult<u8> {
-    let buf: [u8; 1] = read_byte_array(cursor)?;
-    Ok(buf[0])
-}
-
-pub fn read_u32_from_cursor_as_be<T: AsRef<[u8]>>(
-    cursor: &mut std::io::Cursor<T>,
-) -> self::LibDNSResult<u32> {
-    const SIZE: usize = std::mem::size_of::<u32>() / std::mem::size_of::<u8>();
-    let buf: [u8; SIZE] = read_byte_array(cursor)
-        .context("Failed to get byte array from cursor for u32 be".to_string())?;
-    Ok(u32::from_be_bytes(buf))
-}
-
-pub fn read_u128_from_cursor_as_be<T: AsRef<[u8]>>(
-    cursor: &mut std::io::Cursor<T>,
-) -> self::LibDNSResult<u128> {
-    const SIZE: usize = std::mem::size_of::<u128>() / std::mem::size_of::<u8>();
-    let buf: [u8; SIZE] = read_byte_array(cursor)
-        .context("Failed to get byte array from cursor for u128 be".to_string())?;
-    Ok(u128::from_be_bytes(buf))
-}
-
-pub trait TryFromCursor<T> where T: AsRef<[u8]> {
-    fn try_from_cursor_be(_cursor: &mut std::io::Cursor<T>) -> self::LibDNSResult<Self>
+impl<T> TryFromCursor<T> for DNSHeader
+where
+    T: AsRef<[u8]>,
+{
+    fn try_from_cursor_be(cursor: &mut std::io::Cursor<T>) -> self::LibDNSResult<Self>
     where
         Self: Sized,
     {
-        unimplemented!()
+        let id = DNSHeaderID::try_from_cursor_be(cursor)?;
+        let flags = DNSHeaderFlags::try_from_cursor_be(cursor)?;
+        let qdcount = read_u16_from_cursor_as_be(cursor)?;
+        let ancount = read_u16_from_cursor_as_be(cursor)?;
+        let nscount = read_u16_from_cursor_as_be(cursor)?;
+        let arcount = read_u16_from_cursor_as_be(cursor)?;
+        Ok(Self {
+            id: id.0,
+            flags: flags.0,
+            qdcount,
+            ancount,
+            nscount,
+            arcount,
+        })
     }
-    fn try_from_cursor_le(_cursor: &mut std::io::Cursor<T>) -> self::LibDNSResult<Self>
+}
+
+impl<T> TryFromCursor<T> for DNSHeaderFlags
+where
+    T: AsRef<[u8]>,
+{
+    fn try_from_cursor_be(cursor: &mut std::io::Cursor<T>) -> crate::LibDNSResult<Self>
     where
         Self: Sized,
     {
-        unimplemented!()
+        Ok(Self(read_u16_from_cursor_as_be(cursor).context(
+            "Failed to read u16 from cursor for DNSHeaderFlags".to_string(),
+        )?))
     }
 }
 
-#[repr(transparent)]
-pub struct DNSHeaderID(pub u16);
-impl DNSHeaderID {
-    pub fn as_u16(&self) -> u16 {
-        self.0
-    }
-    pub fn as_byte_array_be(&self) -> [u8; 2] {
-        self.0.to_be_bytes()
-    }
-}
-
-impl<T> TryFromCursor<T> for DNSHeaderID where T: AsRef<[u8]> {
+impl<T> TryFromCursor<T> for DNSHeaderID
+where
+    T: AsRef<[u8]>,
+{
     fn try_from_cursor_be(cursor: &mut std::io::Cursor<T>) -> crate::LibDNSResult<Self>
     where
         Self: Sized,
@@ -97,17 +64,83 @@ impl<T> TryFromCursor<T> for DNSHeaderID where T: AsRef<[u8]> {
         )?))
     }
 }
-
-pub struct DNSHeaderFlags(u16);
-
-impl<T> TryFromCursor<T> for DNSHeaderFlags where T: AsRef<[u8]> {
+impl<T> TryFromCursor<T> for DNSQuestion
+where
+    T: AsRef<[u8]>,
+{
     fn try_from_cursor_be(cursor: &mut std::io::Cursor<T>) -> crate::LibDNSResult<Self>
     where
         Self: Sized,
     {
-        Ok(Self(read_u16_from_cursor_as_be(cursor).context(
-            "Failed to read u16 from cursor for DNSHeaderFlags".to_string(),
-        )?))
+        let qname = QName::try_from_cursor_be(cursor)
+            .context("Failed to parse Qname for DNSQuestion".to_string())?;
+        let qtype = QType::try_from_cursor_be(cursor)
+            .context("Failed to parse QType for DNSQuestion".to_string())?;
+        let qclass = read_u16_from_cursor_as_be(cursor)?;
+        Ok(Self {
+            qname,
+            qtype,
+            qclass,
+        })
+    }
+}
+impl<T> TryFromCursor<T> for QName
+where
+    T: AsRef<[u8]>,
+{
+    fn try_from_cursor_be(cursor: &mut std::io::Cursor<T>) -> crate::LibDNSResult<Self>
+    where
+        Self: Sized,
+    {
+        let start = cursor.position();
+        let first_byte = read_u8_from_cursor(cursor)?;
+        if first_byte == 0x0C {
+            let offset = read_u8_from_cursor(cursor)?;
+            cursor.set_position(offset as u64);
+        }
+        let mut buf: Vec<u8> = Vec::new();
+        loop {
+            let size = read_u8_from_cursor(cursor)?;
+            if size > 63 {
+                return Err(anyhow::Error::msg(format!(
+                    "Invalid size for qname label: {size}"
+                )));
+            }
+            println!("size: {size}");
+            if size == 0 {
+                break;
+            }
+            buf.push(size);
+            for _ in 0..size {
+                let character = read_u8_from_cursor(cursor)?;
+                buf.push(character);
+            }
+        }
+        if first_byte == 0x0C {
+            cursor.set_position(start + 2);
+        }
+
+        if buf.len() > 255 {
+            return Err(anyhow::Error::msg(format!(
+                "Buffer too large for QName. max size 255 {}",
+                buf.len()
+            )));
+        }
+
+        Ok(Self(buf))
+        // validate the buffer? probably a good idea
+    }
+}
+impl<T> TryFromCursor<T> for QType
+where
+    T: AsRef<[u8]>,
+{
+    fn try_from_cursor_be(cursor: &mut std::io::Cursor<T>) -> crate::LibDNSResult<Self>
+    where
+        Self: Sized,
+    {
+        let n = read_u16_from_cursor_as_be(cursor)?;
+        Self::try_from(n)
     }
 }
 
@@ -164,45 +197,12 @@ impl DNSHeaderFlags {
         self.0
     }
 }
-
-// ===== Constants =====
-pub const OPCODE_A: u16 = 0;
-
-// Bit order for flags left -> right
-const QR_BITFLAG: u16 = 0b1000000000000000;
-const OPCODE_BITFLAG: u16 = 0b0111100000000000;
-const AA_BITFLAG: u16 = 0b0000010000000000;
-const TC_BITFLAG: u16 = 0b0000001000000000;
-const RD_BITFLAG: u16 = 0b0000000100000000;
-const RA_BITFLAG: u16 = 0b0000000010000000;
-const Z_BITFLAG: u16 = 0b0000000001000000;
-const AD_BITFLAG: u16 = 0b0000000000100000;
-const CD_BITFLAG: u16 = 0b0000000000010000;
-const RCODE_BITFLAG: u16 = 0b0000000000001111;
-const BOOLEAN_BITFLAG: u16 = 0b0000000000000001;
-
-// ===== Structs and Implementations =====
-#[derive(Debug)]
-pub struct DNSHeader {
-    id: u16,
-    flags: u16,
-    qdcount: u16,
-    ancount: u16,
-    nscount: u16,
-    arcount: u16,
-}
-
-impl<T> TryFromCursor<T> for DNSHeader where T: AsRef<[u8]> {
-    fn try_from_cursor_be(cursor: &mut std::io::Cursor<T>) -> self::LibDNSResult<Self>
-        where
-            Self: Sized, {
-        let id = DNSHeaderID::try_from_cursor_be(cursor)?;
-        let flags= DNSHeaderFlags::try_from_cursor_be(cursor)?;
-        let qdcount = read_u16_from_cursor_as_be(cursor)?;
-        let ancount = read_u16_from_cursor_as_be(cursor)?;
-        let nscount = read_u16_from_cursor_as_be(cursor)?;
-        let arcount = read_u16_from_cursor_as_be(cursor)?;
-        Ok(Self{id:id.0,flags:flags.0,qdcount,ancount,nscount,arcount})
+impl DNSHeaderID {
+    pub fn as_u16(&self) -> u16 {
+        self.0
+    }
+    pub fn as_byte_array_be(&self) -> [u8; 2] {
+        self.0.to_be_bytes()
     }
 }
 
@@ -268,9 +268,95 @@ impl DNSHeader {
     }
 }
 
-// a wrapper over a DNS Query Name
-#[derive(Debug)]
-pub struct QName(Vec<u8>);
+impl DNSQuestion {
+    pub fn to_be_bytes(self) -> Vec<u8> {
+        let mut buf = Vec::<u8>::new();
+        let mut qname = self.qname.to_bytes();
+        buf.append(&mut qname);
+        buf.extend_from_slice(&self.qtype.to_be_bytes());
+        buf.extend_from_slice(&self.qclass.to_be_bytes());
+        buf
+    }
+}
+impl DNSRecord {
+    pub fn parse_from_raw_parts<RData>(
+        name: QName,
+        rtype: u16,
+        class: u16,
+        ttl: u32,
+        rdata: RData,
+    ) -> Self
+    where
+        RData: AsRef<[u8]>,
+    {
+        let name = name.to_fdqn();
+        let rtype = DnsRType::from(rtype);
+        let class = DNSClass::from(class);
+        let mut cursor = std::io::Cursor::new(rdata.as_ref());
+
+        let kind = match rtype {
+            DnsRType::A => {
+                let bits = read_u32_from_cursor_as_be(&mut cursor).unwrap();
+                let addr = std::net::Ipv4Addr::from_bits(bits);
+                DNSRecordKind::A(addr)
+            }
+            DnsRType::AAAA => {
+                let bits = read_u128_from_cursor_as_be(&mut cursor).unwrap();
+                DNSRecordKind::AAAA(Ipv6Addr::from_bits(bits))
+            }
+            other => {
+                todo!("implement {other:?}")
+            }
+        };
+        Self {
+            domain: name,
+            ttl,
+            class,
+            kind,
+        }
+    }
+}
+impl From<u16> for DNSClass {
+    fn from(value: u16) -> Self {
+        match value {
+            1 => DNSClass::IN,
+            2 => DNSClass::CS,
+            3 => DNSClass::CH,
+            4 => DNSClass::HS,
+            254 => DNSClass::NONE,
+            255 => DNSClass::ANY,
+            other => DNSClass::Unknown(other),
+        }
+    }
+}
+
+impl From<u16> for DnsRType {
+    fn from(value: u16) -> Self {
+        match value {
+            1 => DnsRType::A,
+            2 => DnsRType::NS,
+            5 => DnsRType::CNAME,
+            6 => DnsRType::SOA,
+            12 => DnsRType::PTR,
+            15 => DnsRType::MX,
+            16 => DnsRType::TXT,
+            28 => DnsRType::AAAA,
+            33 => DnsRType::SRV,
+            43 => DnsRType::DS,
+            46 => DnsRType::RRSIG,
+            48 => DnsRType::DNSKEY,
+            52 => DnsRType::TLSA,
+            64 => DnsRType::SVCB,
+            65 => DnsRType::HTTPS,
+            41 => DnsRType::OPT,
+            252 => DnsRType::AXFR,
+            253 => DnsRType::MAILB,
+            254 => DnsRType::MAILA,
+            255 => DnsRType::ANY,
+            other => DnsRType::Unknown(other),
+        }
+    }
+}
 impl QName {
     pub fn to_bytes(&self) -> Vec<u8> {
         self.0.clone()
@@ -350,211 +436,91 @@ impl QName {
         s
     }
 }
-impl<T>  TryFromCursor<T> for QName where T: AsRef<[u8]> {
-    fn try_from_cursor_be(cursor: &mut std::io::Cursor<T>) -> crate::LibDNSResult<Self>
-        where
-            Self: Sized, {
-        let start = cursor.position();
-        let first_byte = read_u8_from_cursor(cursor)?;
-        if first_byte == 0x0C {
-            let offset = read_u8_from_cursor(cursor)?;
-            cursor.set_position(offset as u64);
-        }
-        let mut buf: Vec<u8> = Vec::new();
-        loop {
-            let size = read_u8_from_cursor(cursor)?;
-            if size > 63 {
-                return Err(anyhow::Error::msg(format!("Invalid size for qname label: {size}")))
-            }
-            println!("size: {size}");
-            if size == 0 {
-                break;
-            }
-            buf.push(size);
-            for _ in 0..size {
-                let character = read_u8_from_cursor(cursor)?;
-                buf.push(character);
-            }
-        }
-        if first_byte == 0x0C {
-            cursor.set_position( start + 2);
-        }
 
-        if buf.len() > 255 {
-            return Err(anyhow::Error::msg(format!("Buffer too large for QName. max size 255 {}",buf.len())))
-        }
-
-        Ok(Self(buf))
-        // validate the buffer? probably a good idea
-
-
-        
+impl QType {
+    pub fn to_be_bytes(self) -> [u8; 2] {
+        (self as u16).to_be_bytes()
+    }
+    pub fn from_be_bytes(bytes: [u8; 2]) -> Self {
+        Self::try_from(bytes).expect("Valid byte sequence for QType")
+    }
+}
+impl std::convert::TryFrom<&[u8; 2]> for QType {
+    type Error = LibDNSError;
+    fn try_from(value: &[u8; 2]) -> Result<Self, Self::Error> {
+        let n = u16::from_be_bytes(*value);
+        Self::try_from(n)
+    }
+}
+impl std::convert::TryFrom<&[u8]> for QType {
+    type Error = LibDNSError;
+    fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
+        let mut arr = [0, 0];
+        arr.copy_from_slice(value);
+        let n = u16::from_be_bytes(arr);
+        Self::try_from(n)
+    }
+}
+impl std::convert::TryFrom<Vec<u8>> for QType {
+    type Error = LibDNSError;
+    fn try_from(value: Vec<u8>) -> Result<Self, Self::Error> {
+        let bytes = value.get(0..2).ok_or(anyhow::Error::msg(
+            "QType TryFrom<Vec<u8>> Failed to get 2 bytes for u16 converson",
+        ))?;
+        let n = u16::from_be_bytes(
+            bytes
+                .try_into()
+                .context("failed to convert byte slice into u16 value for QType".to_string())?,
+        );
+        Self::try_from(n)
     }
 }
 
-#[test]
-pub fn libdns_test_qname_from_fdqn() {
-    let fdqn = "";
-    let r = QName::try_from_fdqn(fdqn);
-    assert!(r.is_err());
-    // the root domain
-    let fdqn = ".";
-    let r = QName::try_from_fdqn(fdqn);
-    assert!(r.is_ok());
-
-    let fdqn = "a.";
-    let r = QName::try_from_fdqn(fdqn);
-    assert!(r.is_ok());
-
-    let fdqn = "www.github.com.";
-    let q = QName::try_from_fdqn(fdqn).unwrap();
-    let s = q.to_fdqn();
-    println!("{:?},{}", &q, &s);
-    assert_eq!(fdqn, s);
-}
-
-#[derive(Debug)]
-pub struct DNSQuestion {
-    qname: QName,
-    qtype: QType,
-    qclass: u16,
-}
-impl<T> TryFromCursor<T> for DNSQuestion where T: AsRef<[u8]> {
-    fn try_from_cursor_be(cursor: &mut std::io::Cursor<T>) -> crate::LibDNSResult<Self>
-        where
-            Self: Sized, {
-        let qname = QName::try_from_cursor_be(cursor).context("Failed to parse Qname for DNSQuestion".to_string())?;
-        let qtype = QType::try_from_cursor_be(cursor).context("Failed to parse QType for DNSQuestion".to_string())?;
-        let qclass = read_u16_from_cursor_as_be(cursor)?;
-        Ok(Self{qname,qtype,qclass})
-    
-        
+impl std::convert::TryFrom<[u8; 2]> for QType {
+    type Error = LibDNSError;
+    fn try_from(value: [u8; 2]) -> Result<Self, Self::Error> {
+        let n = u16::from_be_bytes(value);
+        Self::try_from(n)
     }
 }
-
-
-
-impl DNSQuestion {
-    pub fn to_be_bytes(self) -> Vec<u8> {
-        let mut buf = Vec::<u8>::new();
-        let mut qname = self.qname.to_bytes();
-        buf.append(&mut qname);
-        buf.extend_from_slice(&self.qtype.to_be_bytes());
-        buf.extend_from_slice(&self.qclass.to_be_bytes());
-        buf
-    }
-}
-
-
-impl From<u16> for DnsRType {
-    fn from(value: u16) -> Self {
+impl std::convert::TryFrom<u16> for QType {
+    type Error = LibDNSError;
+    fn try_from(value: u16) -> std::result::Result<Self, Self::Error> {
         match value {
-            1 => DnsRType::A,
-            2 => DnsRType::NS,
-            5 => DnsRType::CNAME,
-            6 => DnsRType::SOA,
-            12 => DnsRType::PTR,
-            15 => DnsRType::MX,
-            16 => DnsRType::TXT,
-            28 => DnsRType::AAAA,
-            33 => DnsRType::SRV,
-            43 => DnsRType::DS,
-            46 => DnsRType::RRSIG,
-            48 => DnsRType::DNSKEY,
-            52 => DnsRType::TLSA,
-            64 => DnsRType::SVCB,
-            65 => DnsRType::HTTPS,
-            41 => DnsRType::OPT,
-            252 => DnsRType::AXFR,
-            253 => DnsRType::MAILB,
-            254 => DnsRType::MAILA,
-            255 => DnsRType::ANY,
-            other => DnsRType::Unknown(other),
+            1 => Ok(Self::A),
+            2 => Ok(Self::NS),
+            5 => Ok(Self::CNAME),
+            6 => Ok(Self::SOA),
+            12 => Ok(Self::PTR),
+            15 => Ok(Self::MX),
+            16 => Ok(Self::TXT),
+            28 => Ok(Self::AAAA),
+            33 => Ok(Self::SRV),
+            255 => Ok(Self::Any),
+            _ => Err(anyhow::Error::msg(format!(
+                "The u16 value {value} is not valid for type QType"
+            ))),
         }
     }
 }
+pub const DEFAULT_IO_BUFFER_BYTE_COUNT: usize = 1024;
 
-
-
-#[derive(Debug)]
-pub enum SvcParam {
-    Alpn(Vec<String>),
-    NoDefaultAlpn,
-    Port(u16),
-    Ipv4Hint(Vec<Ipv4Addr>),
-    Ipv6Hint(Vec<Ipv6Addr>),
-    Ech(Vec<u8>),
-    DohPath(String),
-    Opaque(u16, Vec<u8>), // Key-value pair for unrecognized keys
-}
+// ===== Constants =====
+pub const OPCODE_A: u16 = 0;
 
 #[repr(u16)]
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum DNSClass {
-    IN = 1,       // Internet
-    CS = 2,       // CSNET (obsolete)
-    CH = 3,       // CHAOS
-    HS = 4,       // Hesiod
+    IN = 1, // Internet
+    CS = 2, // CSNET (obsolete)
+    CH = 3, // CHAOS
+    HS = 4, // Hesiod
 
-    NONE = 254,   // Used in DNS UPDATE
-    ANY = 255,    // Wildcard match
+    NONE = 254, // Used in DNS UPDATE
+    ANY = 255,  // Wildcard match
 
     Unknown(u16), // Fallback for undefined values
 }
-impl From<u16> for DNSClass {
-    fn from(value: u16) -> Self {
-        match value {
-            1 => DNSClass::IN,
-            2 => DNSClass::CS,
-            3 => DNSClass::CH,
-            4 => DNSClass::HS,
-            254 => DNSClass::NONE,
-            255 => DNSClass::ANY,
-            other => DNSClass::Unknown(other),
-        }
-    }
-}
-
-#[derive(Debug)]
-pub struct DNSRecord {
-    pub domain: String,
-    pub ttl: u32,
-    pub class: DNSClass,
-    pub kind: DNSRecordKind,
-}
-impl DNSRecord {
-    pub fn parse_from_raw_parts<RData>(name:QName,rtype:u16,class:u16,ttl:u32,rdata:RData)  -> Self where RData: AsRef<[u8]>{
-        let name = name.to_fdqn();
-        let rtype = DnsRType::from(rtype);
-        let class = DNSClass::from(class);
-        let mut cursor = std::io::Cursor::new(rdata.as_ref());
-
-        let kind = match rtype {
-            DnsRType::A => {
-                let bits = read_u32_from_cursor_as_be(&mut cursor).unwrap();
-                let addr = std::net::Ipv4Addr::from_bits(bits);
-                DNSRecordKind::A(addr)
-            }
-            DnsRType::AAAA => {
-                let bits = read_u128_from_cursor_as_be(&mut cursor).unwrap();
-                DNSRecordKind::AAAA(Ipv6Addr::from_bits(bits)) 
-            },
-            other => {
-                todo!("implement {other:?}")
-            }
-        };
-        Self{
-            domain:name,
-            ttl,
-            class,
-            kind
-        }
-    }
-}
-
-
-
-
 
 #[derive(Debug)]
 pub enum DNSRecordKind {
@@ -633,149 +599,6 @@ pub enum DNSRecordKind {
     },
 }
 
-
-#[repr(u16)]
-#[derive(Debug, PartialEq, Eq)]
-pub enum RCode {
-    NoError = 0,
-    FormErr,
-    ServFail,
-    NXDomain,
-    NotImp,
-    Refused,
-    YXDomain,
-    YXRRSet,
-    NXRRSet,
-    NotAuth,
-}
-
-#[derive(Debug, Default)]
-#[repr(u16)]
-pub enum QType {
-    #[default]
-    A = 1,
-    NS = 2,
-    CNAME = 5,
-    SOA = 6,
-    PTR = 12,
-    MX = 15,
-    TXT = 16,
-    AAAA = 28,
-    SRV = 33,
-    Any = 255,
-}
-impl<T> TryFromCursor<T> for QType where T: AsRef<[u8]> {
-    fn try_from_cursor_be(cursor: &mut std::io::Cursor<T>) -> crate::LibDNSResult<Self>
-        where
-            Self: Sized, {
-        let n = read_u16_from_cursor_as_be(cursor)?;
-        Self::try_from(n)
-    }
-}
-impl std::convert::TryFrom<u16> for QType {
-    type Error = LibDNSError;
-    fn try_from(value: u16) -> std::result::Result<Self, Self::Error> {
-        match value {
-            1 => Ok(Self::A),
-            2 => Ok(Self::NS),
-            5 => Ok(Self::CNAME),
-            6 => Ok(Self::SOA),
-            12 => Ok(Self::PTR),
-            15 => Ok(Self::MX),
-            16 => Ok(Self::TXT),
-            28 => Ok(Self::AAAA),
-            33 => Ok(Self::SRV),
-            255 => Ok(Self::Any),
-            _ => Err(anyhow::Error::msg(format!(
-                "The u16 value {value} is not valid for type QType"
-            ))),
-        }
-    }
-}
-
-impl std::convert::TryFrom<[u8; 2]> for QType {
-    type Error = LibDNSError;
-    fn try_from(value: [u8; 2]) -> Result<Self, Self::Error> {
-        let n = u16::from_be_bytes(value);
-        Self::try_from(n)
-    }
-}
-impl std::convert::TryFrom<&[u8; 2]> for QType {
-    type Error = LibDNSError;
-    fn try_from(value: &[u8; 2]) -> Result<Self, Self::Error> {
-        let n = u16::from_be_bytes(*value);
-        Self::try_from(n)
-    }
-}
-impl std::convert::TryFrom<&[u8]> for QType {
-    type Error = LibDNSError;
-    fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
-        let mut arr = [0, 0];
-        arr.copy_from_slice(value);
-        let n = u16::from_be_bytes(arr);
-        Self::try_from(n)
-    }
-}
-impl std::convert::TryFrom<Vec<u8>> for QType {
-    type Error = LibDNSError;
-    fn try_from(value: Vec<u8>) -> Result<Self, Self::Error> {
-        let bytes = value.get(0..2).ok_or(anyhow::Error::msg(
-            "QType TryFrom<Vec<u8>> Failed to get 2 bytes for u16 converson"
-        ))?;
-        let n = u16::from_be_bytes(
-            bytes
-                .try_into()
-                .context("failed to convert byte slice into u16 value for QType".to_string())?,
-        );
-        Self::try_from(n)
-    }
-}
-#[derive(Debug)]
-pub struct DNSResponse {
-    pub header: DNSHeader,
-    pub questions: Vec<DNSQuestion>,
-    pub records: Vec<DNSRecord>,
-}
-
-
-impl QType {
-    pub fn to_be_bytes(self) -> [u8; 2] {
-        (self as u16).to_be_bytes()
-    }
-    pub fn from_be_bytes(bytes: [u8; 2]) -> Self {
-        Self::try_from(bytes).expect("Valid byte sequence for QType")
-    }
-}
-// ===== Functions =====
-pub fn hostname_is_valid(name: &str) -> bool {
-    if name.len() > 253 {
-        return false;
-    }
-    if name.starts_with('-') && name.ends_with('-') {
-        return false;
-    }
-
-    for segment in name.split('.') {
-        if segment.len() > 63 {
-            return false;
-        }
-        for char in segment.chars() {
-            if ('\0'..='/').contains(&char)
-                || (':'..='@').contains(&char)
-                || ('['..='`').contains(&char)
-                || char >= '{'
-            {
-                return false;
-            }
-        }
-    }
-
-    true
-}
-
-
-
-
 #[repr(u16)]
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum DnsRType {
@@ -808,23 +631,52 @@ pub enum DnsRType {
     MAILB = 253,
     MAILA = 254,
     ANY = 255,
-    
+
     // Unknown (fallback)
     Unknown(u16),
 }
 
+#[derive(Debug, Default)]
+#[repr(u16)]
+pub enum QType {
+    #[default]
+    A = 1,
+    NS = 2,
+    CNAME = 5,
+    SOA = 6,
+    PTR = 12,
+    MX = 15,
+    TXT = 16,
+    AAAA = 28,
+    SRV = 33,
+    Any = 255,
+}
 
+#[repr(u16)]
+#[derive(Debug, PartialEq, Eq)]
+pub enum RCode {
+    NoError = 0,
+    FormErr,
+    ServFail,
+    NXDomain,
+    NotImp,
+    Refused,
+    YXDomain,
+    YXRRSet,
+    NXRRSet,
+    NotAuth,
+}
 
-/// for a DNS answer field: handles compressed responses
-
-pub fn qname_to_bytes(qname: &str) -> Vec<u8> {
-    let mut output = Vec::<u8>::new();
-    for segment in qname.split('.') {
-        output.push(segment.bytes().len() as u8);
-        output.extend_from_slice(segment.as_bytes());
-    }
-    output.push(0);
-    output
+#[derive(Debug)]
+pub enum SvcParam {
+    Alpn(Vec<String>),
+    NoDefaultAlpn,
+    Port(u16),
+    Ipv4Hint(Vec<Ipv4Addr>),
+    Ipv6Hint(Vec<Ipv6Addr>),
+    Ech(Vec<u8>),
+    DohPath(String),
+    Opaque(u16, Vec<u8>), // Key-value pair for unrecognized keys
 }
 
 pub fn dns_resolve_hostname(
@@ -860,19 +712,18 @@ pub fn dns_resolve_hostname(
     header.set_recursion_desired(true);
     header.qdcount = question_types.len() as u16;
 
-
     println!("request_header {header:?}");
 
     let mut header_bytes = header.to_be_bytes();
     let mut output = vec![];
     output.append(&mut header_bytes);
-    
+
     for qtype in question_types {
         let question = DNSQuestion {
             qtype: qtype,
             qclass: 1,
             qname: QName::try_from_fdqn(name)
-            .context("Failed to convert the input name to a QName value".to_string())?,
+                .context("Failed to convert the input name to a QName value".to_string())?,
         };
         output.append(&mut question.to_be_bytes());
     }
@@ -926,10 +777,12 @@ pub fn dns_resolve_hostname(
     for _ in 0..header.ancount {
         println!("parse answer");
         // let slice = io_buffer.get(byte_index..).unwrap();
-        let name: QName = QName::try_from_cursor_be(&mut cursor).context("failed to parse qname for answer".to_string()).unwrap();
-        
+        let name: QName = QName::try_from_cursor_be(&mut cursor)
+            .context("failed to parse qname for answer".to_string())
+            .unwrap();
+
         let rtype: u16 = read_u16_from_cursor_as_be(&mut cursor)?;
-        
+
         let class: u16 = read_u16_from_cursor_as_be(&mut cursor)?;
 
         let ttl: u32 = read_u32_from_cursor_as_be(&mut cursor)?;
@@ -952,6 +805,53 @@ pub fn dns_resolve_hostname(
         records,
     })
 }
+// ===== Functions =====
+pub fn hostname_is_valid(name: &str) -> bool {
+    if name.len() > 253 {
+        return false;
+    }
+    if name.starts_with('-') && name.ends_with('-') {
+        return false;
+    }
+
+    for segment in name.split('.') {
+        if segment.len() > 63 {
+            return false;
+        }
+        for char in segment.chars() {
+            if ('\0'..='/').contains(&char)
+                || (':'..='@').contains(&char)
+                || ('['..='`').contains(&char)
+                || char >= '{'
+            {
+                return false;
+            }
+        }
+    }
+
+    true
+}
+
+#[test]
+pub fn libdns_test_qname_from_fdqn() {
+    let fdqn = "";
+    let r = QName::try_from_fdqn(fdqn);
+    assert!(r.is_err());
+    // the root domain
+    let fdqn = ".";
+    let r = QName::try_from_fdqn(fdqn);
+    assert!(r.is_ok());
+
+    let fdqn = "a.";
+    let r = QName::try_from_fdqn(fdqn);
+    assert!(r.is_ok());
+
+    let fdqn = "www.github.com.";
+    let q = QName::try_from_fdqn(fdqn).unwrap();
+    let s = q.to_fdqn();
+    println!("{:?},{}", &q, &s);
+    assert_eq!(fdqn, s);
+}
 
 // ===== Tests =====
 #[test]
@@ -965,10 +865,145 @@ pub fn libdns_test_qname_to_bytes() {
     );
 }
 
+/// for a DNS answer field: handles compressed responses
+
+pub fn qname_to_bytes(qname: &str) -> Vec<u8> {
+    let mut output = Vec::<u8>::new();
+    for segment in qname.split('.') {
+        output.push(segment.bytes().len() as u8);
+        output.extend_from_slice(segment.as_bytes());
+    }
+    output.push(0);
+    output
+}
+
+pub fn read_byte_array<const BYTECOUNT: usize, T: AsRef<[u8]>>(
+    cursor: &mut std::io::Cursor<T>,
+) -> self::LibDNSResult<[u8; BYTECOUNT]> {
+    let mut buf: [u8; BYTECOUNT] = [0_u8; BYTECOUNT];
+    cursor
+        .read_exact(&mut buf)
+        .context("Failed to read {BYTECOUNT} bytes into an array".to_string())?;
+    Ok(buf)
+}
+
+pub fn read_u128_from_cursor_as_be<T: AsRef<[u8]>>(
+    cursor: &mut std::io::Cursor<T>,
+) -> self::LibDNSResult<u128> {
+    const SIZE: usize = std::mem::size_of::<u128>() / std::mem::size_of::<u8>();
+    let buf: [u8; SIZE] = read_byte_array(cursor)
+        .context("Failed to get byte array from cursor for u128 be".to_string())?;
+    Ok(u128::from_be_bytes(buf))
+}
+
+// parser / network helper functions
+pub fn read_u16_from_cursor_as_be<T: AsRef<[u8]>>(
+    cursor: &mut std::io::Cursor<T>,
+) -> self::LibDNSResult<u16> {
+    const SIZE: usize = std::mem::size_of::<u16>() / std::mem::size_of::<u8>();
+    let bytes: [u8; SIZE] = read_byte_array(cursor)
+        .context("Failed to get byte array from cursor for u16 be".to_string())?;
+    Ok(u16::from_be_bytes(bytes))
+}
+
+pub fn read_u32_from_cursor_as_be<T: AsRef<[u8]>>(
+    cursor: &mut std::io::Cursor<T>,
+) -> self::LibDNSResult<u32> {
+    const SIZE: usize = std::mem::size_of::<u32>() / std::mem::size_of::<u8>();
+    let buf: [u8; SIZE] = read_byte_array(cursor)
+        .context("Failed to get byte array from cursor for u32 be".to_string())?;
+    Ok(u32::from_be_bytes(buf))
+}
+pub fn read_u8_from_cursor<T: AsRef<[u8]>>(
+    cursor: &mut std::io::Cursor<T>,
+) -> self::LibDNSResult<u8> {
+    let buf: [u8; 1] = read_byte_array(cursor)?;
+    Ok(buf[0])
+}
+
+pub fn read_vector_of_bytes<T: AsRef<[u8]>>(
+    size: usize,
+    cursor: &mut std::io::Cursor<T>,
+) -> self::LibDNSResult<Vec<u8>> {
+    let mut buf = vec![0_u8; size];
+    let err = format!("Failed to read {size} bytes from the cursor into the buffer");
+    cursor.read_exact(&mut buf).context(err)?;
+    Ok(buf)
+}
+
 #[test]
 pub fn test_resolve_hostname() {
-    let response =dns_resolve_hostname("1.1.1.1:53", vec![QType::A, QType::AAAA], "www.github.com.").context("test failed".to_string()).unwrap();
+    let response =
+        dns_resolve_hostname("1.1.1.1:53", vec![QType::A, QType::AAAA], "www.github.com.")
+            .context("test failed".to_string())
+            .unwrap();
     dbg!(response);
     // println!("{bytes:?}");
     // println!("{bytes2:?}");
 }
+pub mod protocol;
+
+pub struct DNSHeaderFlags(u16);
+
+#[repr(transparent)]
+pub struct DNSHeaderID(pub u16);
+
+// ===== Structs and Implementations =====
+#[derive(Debug)]
+pub struct DNSHeader {
+    id: u16,
+    flags: u16,
+    qdcount: u16,
+    ancount: u16,
+    nscount: u16,
+    arcount: u16,
+}
+
+#[derive(Debug)]
+pub struct DNSQuestion {
+    qname: QName,
+    qtype: QType,
+    qclass: u16,
+}
+
+#[derive(Debug)]
+pub struct DNSRecord {
+    pub domain: String,
+    pub ttl: u32,
+    pub class: DNSClass,
+    pub kind: DNSRecordKind,
+}
+#[derive(Debug)]
+pub struct DNSResponse {
+    pub header: DNSHeader,
+    pub questions: Vec<DNSQuestion>,
+    pub records: Vec<DNSRecord>,
+}
+
+// a wrapper over a DNS Query Name
+#[derive(Debug)]
+pub struct QName(Vec<u8>);
+
+pub trait TryFromCursor<T>
+where
+    T: AsRef<[u8]>,
+{
+    fn try_from_cursor_be(_cursor: &mut std::io::Cursor<T>) -> self::LibDNSResult<Self>
+    where
+        Self: Sized,
+    {
+        unimplemented!()
+    }
+    fn try_from_cursor_le(_cursor: &mut std::io::Cursor<T>) -> self::LibDNSResult<Self>
+    where
+        Self: Sized,
+    {
+        unimplemented!()
+    }
+}
+pub use anyhow::Error as LibDNSError;
+pub use anyhow::Result as LibDNSResult;
+type IoBuffer<const SIZE: usize = DEFAULT_IO_BUFFER_BYTE_COUNT> = [u8; SIZE];
+use anyhow::Context;
+use std::io::{BufRead, Bytes, Cursor, Read, Write};
+use std::net::{Ipv4Addr, Ipv6Addr, UdpSocket};

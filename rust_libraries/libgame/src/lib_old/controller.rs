@@ -1,7 +1,11 @@
-// note Xinput api is only available on windows
+
 
 #[cfg(target_os="windows")]
-use windows::Win32::UI::Input::XboxController::XINPUT_GAMEPAD;
+pub enum XInputGetStateResult {
+    ControllerConnected(XboxControllerInputState),
+    ControllerNotConnected,
+    Error(u32)
+}
 
 
 #[cfg(target_os="windows")]
@@ -13,44 +17,34 @@ pub fn load_xinput_dll() -> Result<windows::Win32::Foundation::HMODULE, windows:
     }
 
 }
+
 #[cfg(target_os="windows")]
+#[test]
+pub fn test_xbox_controller_xinput() -> Result<(),Box<dyn std::error::Error>> {
+    let module = load_xinput_dll()?;
+    
+    for _ in 0..65535 {
+
+        let state = xinput_get_state(module,0);
+        match state {
+            XInputGetStateResult::ControllerConnected(gamepad )=>{
+                println!("{:?}",gamepad)
+            },
+            _=>{}
+        }
+        std::thread::sleep(std::time::Duration::from_millis(250));
+    }
+
+
+
+
+    unload_xinput_dll(module)?;
+    Ok(())
+}#[cfg(target_os="windows")]
 pub fn unload_xinput_dll(module:windows::Win32::Foundation::HMODULE) -> Result<(), windows::core::Error> {
     unsafe {
         windows::Win32::Foundation::FreeLibrary(module)
     }
-}
-#[derive(Default,Debug,PartialEq,Eq)]
-pub struct XboxControllerInputState {
-    pub controller_id: u8,
-    pub raw_button_flags:u16,
-    pub left_trigger: u8,
-    pub right_trigger:u8,
-    pub left_thumbstick_x_axis:  i16,
-    pub left_thumbstick_y_axis:  i16,
-    pub right_thumbstick_x_axis: i16,
-    pub right_thumbstick_y_axis: i16,
-    pub a:bool,
-    pub b:bool,
-    pub x:bool,
-    pub y:bool,
-    pub dpad_up:bool,
-    pub dpad_left:bool,
-    pub dpad_right:bool,
-    pub dpad_down:bool,
-    pub left_thumbstick_pressed:bool,
-    pub right_thumbstick_pressed:bool,
-    pub right_shoulder:bool,
-    pub left_shoulder:bool,
-    pub start:bool,
-    pub select:bool
-}
-
-
-#[cfg(target_os="windows")]
-pub enum XInputGetStateResult {
-    ControllerConnected(XboxControllerInputState),
-    ControllerNotConnected,
-    Error(u32)
 }
 
 #[cfg(target_os="windows")]
@@ -134,27 +128,32 @@ pub fn xinput_get_state(module:windows::Win32::Foundation::HMODULE,controller_nu
     XInputGetStateResult::ControllerConnected(controller_state)
 
 }
+#[derive(Default,Debug,PartialEq,Eq)]
+pub struct XboxControllerInputState {
+    pub controller_id: u8,
+    pub raw_button_flags:u16,
+    pub left_trigger: u8,
+    pub right_trigger:u8,
+    pub left_thumbstick_x_axis:  i16,
+    pub left_thumbstick_y_axis:  i16,
+    pub right_thumbstick_x_axis: i16,
+    pub right_thumbstick_y_axis: i16,
+    pub a:bool,
+    pub b:bool,
+    pub x:bool,
+    pub y:bool,
+    pub dpad_up:bool,
+    pub dpad_left:bool,
+    pub dpad_right:bool,
+    pub dpad_down:bool,
+    pub left_thumbstick_pressed:bool,
+    pub right_thumbstick_pressed:bool,
+    pub right_shoulder:bool,
+    pub left_shoulder:bool,
+    pub start:bool,
+    pub select:bool
+}
+// note Xinput api is only available on windows
 
 #[cfg(target_os="windows")]
-#[test]
-pub fn test_xbox_controller_xinput() -> Result<(),Box<dyn std::error::Error>> {
-    let module = load_xinput_dll()?;
-    
-    for _ in 0..65535 {
-
-        let state = xinput_get_state(module,0);
-        match state {
-            XInputGetStateResult::ControllerConnected(gamepad )=>{
-                println!("{:?}",gamepad)
-            },
-            _=>{}
-        }
-        std::thread::sleep(std::time::Duration::from_millis(250));
-    }
-
-
-
-
-    unload_xinput_dll(module)?;
-    Ok(())
-}
+use windows::Win32::UI::Input::XboxController::XINPUT_GAMEPAD;

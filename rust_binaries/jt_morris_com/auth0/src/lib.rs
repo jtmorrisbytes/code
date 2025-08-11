@@ -1,23 +1,3 @@
-use serde::Deserialize;
-use std::{collections::HashMap, fmt::Debug};
-
-#[deny(unused_imports, unused_import_braces)]
-pub mod management;
-
-#[derive(serde::Serialize, serde::Deserialize, Clone, PartialEq, Eq)]
-#[cfg_attr(any(feature = "debug", debug_assertions), derive(Debug))]
-pub struct AccessTokenResponse {
-    access_token: String,
-    expires_in: i64,
-    token_type: String,
-}
-// #[cfg_attr(any(feature = "debug", debug_assertions), derive(Debug))]
-#[derive(PartialEq, Debug)]
-pub struct AccessToken<Claims: for<'de> serde::Deserialize<'de> + PartialEq + Debug> {
-    access_token: String,
-    claims: Claims,
-    // expires: time::OffsetDateTime,
-}
 
 impl<Claims: for<'de> serde::Deserialize<'de> + PartialEq + Debug> AccessToken<Claims> {
     pub fn claims(&self) -> &Claims {
@@ -29,159 +9,6 @@ impl<Claims: for<'de> serde::Deserialize<'de> + PartialEq + Debug> AccessToken<C
     // pub fn expires(&self) -> &time::OffsetDateTime {
     //     &self.expires
     // }
-}
-pub async fn get_jwks(base_url: &url::Url) -> Result<jsonwebtoken::jwk::JwkSet, self::Error> {
-    let url = base_url.join(".well-known/jwks.json")?;
-    Ok(reqwest::get(url).await?.json().await?)
-}
-#[derive(serde::Serialize, serde::Deserialize, Clone, PartialEq, Eq, Debug, thiserror::Error)]
-pub enum Error {
-    #[error(
-        "The caller should re-attempt this operation as the client is using exponential backoff"
-    )]
-    RetryWithBackoff { delay: u64 },
-    #[error("Authentication Error: {0}")]
-    AuthenticationError(AuthenticationError),
-    #[error("Json Parse Error: {0}")]
-    SerdeJsonParseError(String),
-    #[error("Time library error: {0}")]
-    TimeError(String),
-    #[error("Url parse error: {0}")]
-    UrlParseError(String),
-    #[error("Jsonwebtoken library error {0}")]
-    JsonwebtokenError(String),
-    #[error("Reqwest library error")]
-    ReqwestError(String),
-    #[error("General Errror: {0}")]
-    Other(String),
-}
-impl std::convert::From<reqwest::Error> for Error {
-    fn from(value: reqwest::Error) -> Self {
-        Self::ReqwestError(value.to_string())
-    }
-}
-impl std::convert::From<jsonwebtoken::errors::Error> for Error {
-    fn from(value: jsonwebtoken::errors::Error) -> Self {
-        Self::JsonwebtokenError(value.to_string())
-    }
-}
-impl std::convert::From<url::ParseError> for Error {
-    fn from(value: url::ParseError) -> Self {
-        Self::UrlParseError(value.to_string())
-    }
-}
-impl std::convert::From<time::error::ComponentRange> for Error {
-    fn from(value: time::error::ComponentRange) -> Self {
-        Self::TimeError(value.to_string())
-    }
-}
-impl std::convert::From<serde_json::Error> for Error {
-    fn from(value: serde_json::Error) -> Self {
-        Self::SerdeJsonParseError(value.to_string())
-    }
-}
-
-impl std::convert::Into<Error> for AuthenticationError {
-    fn into(self) -> Error {
-        Error::AuthenticationError(self)
-    }
-}
-
-#[derive(serde::Serialize, serde::Deserialize, Clone, PartialEq, Eq, Debug, thiserror::Error)]
-#[error("Authentication Error: {error}. {error_message}")]
-pub struct AuthenticationError {
-    error: String,
-    error_message: String,
-}
-
-#[derive(serde::Serialize, serde::Deserialize, Clone, PartialEq, Eq)]
-#[cfg_attr(any(feature = "debug", debug_assertions), derive(Debug))]
-pub struct ClientCredentialsOptions {
-    pub audience: String,
-    pub scope: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub access_type: Option<AccessType>,
-}
-
-#[derive(serde::Serialize, serde::Deserialize, Clone, PartialEq, Eq)]
-#[cfg_attr(any(feature = "debug", debug_assertions), derive(Debug))]
-#[serde(rename_all = "snake_case")]
-pub enum GrantType {
-    ClientCredentials,
-}
-#[derive(serde::Serialize, serde::Deserialize, Clone, PartialEq, Eq)]
-#[cfg_attr(any(feature = "debug", debug_assertions), derive(Debug))]
-pub enum AccessType {
-    Offline,
-}
-
-#[derive(serde::Serialize, serde::Deserialize, Clone, PartialEq, Eq)]
-pub struct GetAccessTokenUsingClientCredentialsBody {
-    pub client_id: String,
-    pub client_secret: String,
-    pub audience: String,
-    pub grant_type: GrantType,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub access_type: Option<AccessType>,
-    pub scope: String,
-}
-#[derive(serde::Serialize, serde::Deserialize, Clone, PartialEq, Eq)]
-#[allow(non_camel_case_types)]
-pub enum JwtAlgorythm {
-    RS256,
-    HS256,
-}
-impl std::convert::Into<jsonwebtoken::Algorithm> for JwtAlgorythm {
-    fn into(self) -> jsonwebtoken::Algorithm {
-        match self {
-            Self::HS256 => jsonwebtoken::Algorithm::HS256,
-            Self::RS256 => jsonwebtoken::Algorithm::RS256,
-        }
-    }
-}
-impl std::default::Default for JwtAlgorythm {
-    fn default() -> Self {
-        Self::RS256
-    }
-}
-#[derive(serde::Serialize, serde::Deserialize, Clone, PartialEq, Eq)]
-#[cfg_attr(any(feature = "debug", debug_assertions), derive(Debug))]
-pub struct JwtClaims {
-    sub: String,
-    #[serde(flatten)]
-    additional_claims: HashMap<String, serde_json::Value>,
-}
-#[derive(serde::Serialize, serde::Deserialize, Clone, PartialEq, Eq)]
-pub struct AuthenticationClientOptions {
-    pub auth0_domain: String,
-    pub client_id: String,
-    pub client_secret: Option<String>,
-    pub jwks: Option<jsonwebtoken::jwk::JwkSet>,
-    pub jwt_algorythm: Option<JwtAlgorythm>,
-}
-
-pub enum ResponseType {
-    Code,
-    CodeToken,
-    CodeIdToken,
-}
-
-pub struct AuthenticationClient {
-    client: reqwest::Client,
-    base_url: url::Url,
-    client_id: String,
-    client_secret: Option<String>,
-    jwks: jsonwebtoken::jwk::JwkSet,
-    jwt_algorythm: jsonwebtoken::Algorithm,
-    // delay: std::sync::atomic::AtomicU64,
-}
-pub struct StartLoginWithRedirectOptions<'a> {
-    pub scope: &'a str,
-    pub audience: &'a str,
-    pub redirect_uri: &'a str,
-    pub state: &'a str,
-    pub connection: &'a str,
-    pub additional_parameters: std::collections::HashMap<&'a str, &'a str>,
 }
 
 impl AuthenticationClient {
@@ -459,3 +286,176 @@ impl AuthenticationClient {
         }
     }
 }
+impl std::convert::From<jsonwebtoken::errors::Error> for Error {
+    fn from(value: jsonwebtoken::errors::Error) -> Self {
+        Self::JsonwebtokenError(value.to_string())
+    }
+}
+impl std::convert::From<reqwest::Error> for Error {
+    fn from(value: reqwest::Error) -> Self {
+        Self::ReqwestError(value.to_string())
+    }
+}
+impl std::convert::From<serde_json::Error> for Error {
+    fn from(value: serde_json::Error) -> Self {
+        Self::SerdeJsonParseError(value.to_string())
+    }
+}
+impl std::convert::From<time::error::ComponentRange> for Error {
+    fn from(value: time::error::ComponentRange) -> Self {
+        Self::TimeError(value.to_string())
+    }
+}
+impl std::convert::From<url::ParseError> for Error {
+    fn from(value: url::ParseError) -> Self {
+        Self::UrlParseError(value.to_string())
+    }
+}
+
+impl std::convert::Into<Error> for AuthenticationError {
+    fn into(self) -> Error {
+        Error::AuthenticationError(self)
+    }
+}
+impl std::convert::Into<jsonwebtoken::Algorithm> for JwtAlgorythm {
+    fn into(self) -> jsonwebtoken::Algorithm {
+        match self {
+            Self::HS256 => jsonwebtoken::Algorithm::HS256,
+            Self::RS256 => jsonwebtoken::Algorithm::RS256,
+        }
+    }
+}
+impl std::default::Default for JwtAlgorythm {
+    fn default() -> Self {
+        Self::RS256
+    }
+}
+pub async fn get_jwks(base_url: &url::Url) -> Result<jsonwebtoken::jwk::JwkSet, self::Error> {
+    let url = base_url.join(".well-known/jwks.json")?;
+    Ok(reqwest::get(url).await?.json().await?)
+}
+#[derive(serde::Serialize, serde::Deserialize, Clone, PartialEq, Eq)]
+#[cfg_attr(any(feature = "debug", debug_assertions), derive(Debug))]
+pub enum AccessType {
+    Offline,
+}
+#[derive(serde::Serialize, serde::Deserialize, Clone, PartialEq, Eq, Debug, thiserror::Error)]
+pub enum Error {
+    #[error(
+        "The caller should re-attempt this operation as the client is using exponential backoff"
+    )]
+    RetryWithBackoff { delay: u64 },
+    #[error("Authentication Error: {0}")]
+    AuthenticationError(AuthenticationError),
+    #[error("Json Parse Error: {0}")]
+    SerdeJsonParseError(String),
+    #[error("Time library error: {0}")]
+    TimeError(String),
+    #[error("Url parse error: {0}")]
+    UrlParseError(String),
+    #[error("Jsonwebtoken library error {0}")]
+    JsonwebtokenError(String),
+    #[error("Reqwest library error")]
+    ReqwestError(String),
+    #[error("General Errror: {0}")]
+    Other(String),
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Clone, PartialEq, Eq)]
+#[cfg_attr(any(feature = "debug", debug_assertions), derive(Debug))]
+#[serde(rename_all = "snake_case")]
+pub enum GrantType {
+    ClientCredentials,
+}
+#[derive(serde::Serialize, serde::Deserialize, Clone, PartialEq, Eq)]
+#[allow(non_camel_case_types)]
+pub enum JwtAlgorythm {
+    RS256,
+    HS256,
+}
+
+pub enum ResponseType {
+    Code,
+    CodeToken,
+    CodeIdToken,
+}
+
+#[deny(unused_imports, unused_import_braces)]
+pub mod management;
+// #[cfg_attr(any(feature = "debug", debug_assertions), derive(Debug))]
+#[derive(PartialEq, Debug)]
+pub struct AccessToken<Claims: for<'de> serde::Deserialize<'de> + PartialEq + Debug> {
+    access_token: String,
+    claims: Claims,
+    // expires: time::OffsetDateTime,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Clone, PartialEq, Eq)]
+#[cfg_attr(any(feature = "debug", debug_assertions), derive(Debug))]
+pub struct AccessTokenResponse {
+    access_token: String,
+    expires_in: i64,
+    token_type: String,
+}
+#[derive(serde::Serialize, serde::Deserialize, Clone, PartialEq, Eq)]
+pub struct AuthenticationClientOptions {
+    pub auth0_domain: String,
+    pub client_id: String,
+    pub client_secret: Option<String>,
+    pub jwks: Option<jsonwebtoken::jwk::JwkSet>,
+    pub jwt_algorythm: Option<JwtAlgorythm>,
+}
+
+pub struct AuthenticationClient {
+    client: reqwest::Client,
+    base_url: url::Url,
+    client_id: String,
+    client_secret: Option<String>,
+    jwks: jsonwebtoken::jwk::JwkSet,
+    jwt_algorythm: jsonwebtoken::Algorithm,
+    // delay: std::sync::atomic::AtomicU64,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Clone, PartialEq, Eq, Debug, thiserror::Error)]
+#[error("Authentication Error: {error}. {error_message}")]
+pub struct AuthenticationError {
+    error: String,
+    error_message: String,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Clone, PartialEq, Eq)]
+#[cfg_attr(any(feature = "debug", debug_assertions), derive(Debug))]
+pub struct ClientCredentialsOptions {
+    pub audience: String,
+    pub scope: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub access_type: Option<AccessType>,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Clone, PartialEq, Eq)]
+pub struct GetAccessTokenUsingClientCredentialsBody {
+    pub client_id: String,
+    pub client_secret: String,
+    pub audience: String,
+    pub grant_type: GrantType,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub access_type: Option<AccessType>,
+    pub scope: String,
+}
+#[derive(serde::Serialize, serde::Deserialize, Clone, PartialEq, Eq)]
+#[cfg_attr(any(feature = "debug", debug_assertions), derive(Debug))]
+pub struct JwtClaims {
+    sub: String,
+    #[serde(flatten)]
+    additional_claims: HashMap<String, serde_json::Value>,
+}
+pub struct StartLoginWithRedirectOptions<'a> {
+    pub scope: &'a str,
+    pub audience: &'a str,
+    pub redirect_uri: &'a str,
+    pub state: &'a str,
+    pub connection: &'a str,
+    pub additional_parameters: std::collections::HashMap<&'a str, &'a str>,
+}
+use serde::Deserialize;
+use std::{collections::HashMap, fmt::Debug};

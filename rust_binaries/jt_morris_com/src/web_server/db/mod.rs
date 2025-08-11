@@ -6,15 +6,6 @@
 )]
 #![deny(warnings)]
 
-pub mod _url;
-pub mod auth_state;
-pub mod schema;
-pub mod session;
-pub mod transactions;
-pub mod user;
-
-use rocket::figment;
-
 // We are handling both diesel and async_diesel backends for now, prefereing diesel async with tls
 // prefer to build queries using query builder functions and use the macros to run the queries to help handle
 // async <--> sync. you will still need to use async functions to call async, but hopefully you will not need to append '.await' to 200+ callsites
@@ -36,70 +27,130 @@ compile_error!(
     feature = "db-async-pooled"
 ))]
 compile_error!("You cannot enable multiple backends at the same time. Enable feature 'db-sync-pooled' or 'db-async-pooled'");
+#[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
+#[rocket::async_trait]
+impl<'r> rocket::request::FromRequest<'r> for PrimaryDatabasePoolConnection {
+    type Error = anyhow::Error;
+    async fn from_request(
+        r: &'r rocket::Request<'_>,
+    ) -> rocket::request::Outcome<Self, Self::Error> {
+        let pool = match r.guard::<&rocket::State<PrimaryDatabasePool>>().await {
+            rocket::request::Outcome::Success(pool) => pool.inner(),
+            rocket::request::Outcome::Error((status, _error)) => {
+                return rocket::request::Outcome::Error((
+                    status,
+                    anyhow::Error::msg("Failed to extract primary database pool from state"),
+                ));
+            }
+            rocket::request::Outcome::Forward(_) => unimplemented!(),
+        };
+        let result = {
+            #[cfg(feature = "db-async-pooled")]
+            {
+                pool.get().await
+            }
+            #[cfg(feature = "db-sync-pooled")]
+            {
+                pool.get()
+            }
+        };
+        match result {
+            Ok(conn) => rocket::request::Outcome::Success(Self(conn)),
+            Err(e) => rocket::request::Outcome::Error((
+                rocket::http::Status::InternalServerError,
+                anyhow::Error::new(e),
+            )),
+        }
+    }
+}
+#[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
+#[rocket::async_trait]
+impl<'r> rocket::request::FromRequest<'r> for PrimaryDatabasePool {
+    type Error = anyhow::Error;
+    async fn from_request(
+        r: &'r rocket::Request<'_>,
+    ) -> rocket::request::Outcome<Self, Self::Error> {
+        let pool = match r.guard::<&rocket::State<Self>>().await {
+            rocket::request::Outcome::Success(pools) => pools.inner(),
+            rocket::request::Outcome::Error((status, _error)) => {
+                return rocket::request::Outcome::Error((
+                    status,
+                    anyhow::Error::msg("Failed to extract primary database pool from state"),
+                ));
+            }
+            rocket::request::Outcome::Forward(_) => unimplemented!(),
+        };
 
-// use std::fmt::Debug;
-// use std::io::Write;
-// use std::ops::Deref;
-#[cfg(all(
-    not(target_arch = "wasm32"),
-    not(target_os = "unknown"),
-    feature = "db-sync-pooled"
-))]
-pub type Pool<Conn> = diesel::r2d2::Pool<diesel::r2d2::ConnectionManager<Conn>>;
+        rocket::request::Outcome::Success(pool.to_owned())
+    }
+}
+
 #[cfg(all(
     not(target_arch = "wasm32"),
     not(target_os = "unknown"),
     feature = "db-async-pooled"
 ))]
+impl PrimaryDatabasePool {
+    pub async fn get_connection(&self) -> Result<PrimaryDatabasePoolConnection, anyhow::Error> {
+        Ok(PrimaryDatabasePoolConnection(self.0.get().await?))
+    }
+    /// creates a new instance of this type from a figment instance from the path 'databases.primary'.
+    /// expects the path to conform to type crate::DatabaseConfig
+    pub async fn try_new_from_figment(figment: &figment::Figment) -> Result<Self, anyhow::Error> {
+        let url: url::Url = figment.extract_inner("databases.primary.url")?;
+        let max_connections: usize = figment.extract_inner("databases.primary.max_connections")?;
+        let pool = self::create_pool::<diesel::pg::Pg>(url.as_str(), max_connections)
+            .await
+            .map_err(|e| {
+                anyhow::Error::msg(e.to_string())
+                    .context("While attempting to create the primary database pool")
+            })?;
+        Ok(Self(pool))
+    }
+}
+impl PrimaryDatabasePool {
+    pub fn inner(&self) -> self::PgPool {
+        self.0.to_owned()
+    }
+    pub fn into_inner(self) -> self::PgPool {
+        self.0.clone()
+    }
+}
+impl std::ops::DerefMut for PrimaryDatabasePoolConnection {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+impl std::ops::DerefMut for PrimaryDatabasePool {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut (self.0)
+    }
+}
+impl std::ops::Deref for PrimaryDatabasePoolConnection {
+    type Target = PgPooledConnection;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+impl std::ops::Deref for PrimaryDatabasePool {
+    type Target = self::PgPool;
+    fn deref(&self) -> &Self::Target {
+        &(self.0)
+    }
+}
 
-pub type Pool<Conn> = diesel_async::pooled_connection::deadpool::Pool<Conn>;
-#[cfg(all(
-    not(target_arch = "wasm32"),
-    not(target_os = "unknown"),
-    feature = "db-sync-pooled"
-))]
-pub type PgPool = Pool<diesel::pg::PgConnection>;
-#[cfg(all(
-    not(target_arch = "wasm32"),
-    not(target_os = "unknown"),
-    feature = "db-async-pooled"
-))]
-pub type PgPool = Pool<diesel_async::AsyncPgConnection>;
 
-pub use bigdecimal::BigDecimal;
-pub use diesel;
-
-#[cfg(all(
-    not(target_arch = "wasm32"),
-    not(target_os = "unknown"),
-    feature = "db-sync-pooled"
-))]
-pub type Connection = diesel::pg::PgConnection;
-#[cfg(all(
-    not(target_arch = "wasm32"),
-    not(target_os = "unknown"),
-    feature = "db-async-pooled"
-))]
-pub type Connection = diesel_async::pg::AsyncPgConnection;
-
-#[cfg(all(
-    not(target_arch = "wasm32"),
-    not(target_os = "unknown"),
-    feature = "db-sync-pooled"
-))]
-pub type PgPooledConnection<Conn> =
-    diesel::r2d2::PooledConnection<diesel::r2d2::ConnectionManager<diesel::pg::Pg>>;
-#[cfg(all(
-    not(target_arch = "wasm32"),
-    not(target_os = "unknown"),
-    feature = "db-async-pooled"
-))]
-pub type PgPooledConnection =
-    diesel_async::pooled_connection::deadpool::Object<diesel_async::AsyncPgConnection>;
-
-use diesel_migrations::embed_migrations;
-pub use diesel_migrations::{EmbeddedMigrations, MigrationHarness};
-pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!();
+#[macro_export]
+macro_rules! columns {
+    ($path:path)=>{
+        paste::paste!{crate::web_server::db::schema::$path}
+    };
+    ($($path:path),+) => {
+        paste::paste!{
+            ($(crate::web_server::db::schema::$path,)*)
+        }
+    };
+}
 
 // helper macros that determine which piece of code you need to run without writing all of it
 #[macro_export]
@@ -117,25 +168,6 @@ macro_rules! execute {
         }
     }};
 }
-pub use execute;
-
-#[macro_export]
-/// calls query.get_result(&mut connection), but handles sync or async backend for us. blocks on the syncrounous backend
-macro_rules! get_result {
-    ($query:expr,$connection:expr) => {{
-        #[cfg(feature = "db-sync-pooled")]
-        {
-            use diesel::RunQueryDsl;
-            $query.get_result(&mut $connection)
-        }
-        #[cfg(feature = "db-async-pooled")]
-        {
-            use diesel_async::RunQueryDsl;
-            $query.get_result(&mut $connection).await
-        }
-    }};
-}
-pub use get_result;
 
 #[macro_export]
 /// calls query.get_result(&mut connection), but handles sync or async backend for us
@@ -153,21 +185,23 @@ macro_rules! get_results {
         }
     }};
 }
-pub use get_results;
-
 
 #[macro_export]
-macro_rules! columns {
-    ($path:path)=>{
-        paste::paste!{crate::web_server::db::schema::$path}
-    };
-    ($($path:path),+) => {
-        paste::paste!{
-            ($(crate::web_server::db::schema::$path,)*)
+/// calls query.get_result(&mut connection), but handles sync or async backend for us. blocks on the syncrounous backend
+macro_rules! get_result {
+    ($query:expr,$connection:expr) => {{
+        #[cfg(feature = "db-sync-pooled")]
+        {
+            use diesel::RunQueryDsl;
+            $query.get_result(&mut $connection)
         }
-    };
+        #[cfg(feature = "db-async-pooled")]
+        {
+            use diesel_async::RunQueryDsl;
+            $query.get_result(&mut $connection).await
+        }
+    }};
 }
-pub use columns;
 
 #[macro_export]
 ///  A macro that implements queries for Create, Read,Update,and Delete.
@@ -217,239 +251,6 @@ macro_rules! implement_crud {
         pub use delete_by_id;
     };
 }
-// pub fn paste::paste!{upsert_$type:snake} -> (_value:$ty) {}
-// pub fn paste::paste!{upsert_many_$type:snake}(_values:Vec<$ty>){}
-pub use implement_crud;
-
-#[derive(Clone)]
-pub struct PrimaryDatabasePool(PgPool);
-
-#[cfg(all(
-    not(target_arch = "wasm32"),
-    not(target_os = "unknown"),
-    feature = "db-async-pooled"
-))]
-impl PrimaryDatabasePool {
-    pub async fn get_connection(&self) -> Result<PrimaryDatabasePoolConnection, anyhow::Error> {
-        Ok(PrimaryDatabasePoolConnection(self.0.get().await?))
-    }
-    /// creates a new instance of this type from a figment instance from the path 'databases.primary'.
-    /// expects the path to conform to type crate::DatabaseConfig
-    pub async fn try_new_from_figment(figment: &figment::Figment) -> Result<Self, anyhow::Error> {
-        let url: url::Url = figment.extract_inner("databases.primary.url")?;
-        let max_connections: usize = figment.extract_inner("databases.primary.max_connections")?;
-        let pool = self::create_pool::<diesel::pg::Pg>(url.as_str(), max_connections)
-            .await
-            .map_err(|e| {
-                anyhow::Error::msg(e.to_string())
-                    .context("While attempting to create the primary database pool")
-            })?;
-        Ok(Self(pool))
-    }
-}
-impl PrimaryDatabasePool {
-    pub fn inner(&self) -> self::PgPool {
-        self.0.to_owned()
-    }
-    pub fn into_inner(self) -> self::PgPool {
-        self.0.clone()
-    }
-}
-impl std::ops::Deref for PrimaryDatabasePool {
-    type Target = self::PgPool;
-    fn deref(&self) -> &Self::Target {
-        &(self.0)
-    }
-}
-impl std::ops::DerefMut for PrimaryDatabasePool {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut (self.0)
-    }
-}
-#[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
-#[rocket::async_trait]
-impl<'r> rocket::request::FromRequest<'r> for PrimaryDatabasePool {
-    type Error = anyhow::Error;
-    async fn from_request(
-        r: &'r rocket::Request<'_>,
-    ) -> rocket::request::Outcome<Self, Self::Error> {
-        let pool = match r.guard::<&rocket::State<Self>>().await {
-            rocket::request::Outcome::Success(pools) => pools.inner(),
-            rocket::request::Outcome::Error((status, _error)) => {
-                return rocket::request::Outcome::Error((
-                    status,
-                    anyhow::Error::msg("Failed to extract primary database pool from state"),
-                ));
-            }
-            rocket::request::Outcome::Forward(_) => unimplemented!(),
-        };
-
-        rocket::request::Outcome::Success(pool.to_owned())
-    }
-}
-
-pub struct PrimaryDatabasePoolConnection(PgPooledConnection);
-#[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
-#[rocket::async_trait]
-impl<'r> rocket::request::FromRequest<'r> for PrimaryDatabasePoolConnection {
-    type Error = anyhow::Error;
-    async fn from_request(
-        r: &'r rocket::Request<'_>,
-    ) -> rocket::request::Outcome<Self, Self::Error> {
-        let pool = match r.guard::<&rocket::State<PrimaryDatabasePool>>().await {
-            rocket::request::Outcome::Success(pool) => pool.inner(),
-            rocket::request::Outcome::Error((status, _error)) => {
-                return rocket::request::Outcome::Error((
-                    status,
-                    anyhow::Error::msg("Failed to extract primary database pool from state"),
-                ));
-            }
-            rocket::request::Outcome::Forward(_) => unimplemented!(),
-        };
-        let result = {
-            #[cfg(feature = "db-async-pooled")]
-            {
-                pool.get().await
-            }
-            #[cfg(feature = "db-sync-pooled")]
-            {
-                pool.get()
-            }
-        };
-        match result {
-            Ok(conn) => rocket::request::Outcome::Success(Self(conn)),
-            Err(e) => rocket::request::Outcome::Error((
-                rocket::http::Status::InternalServerError,
-                anyhow::Error::new(e),
-            )),
-        }
-    }
-}
-impl std::ops::Deref for PrimaryDatabasePoolConnection {
-    type Target = PgPooledConnection;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-impl std::ops::DerefMut for PrimaryDatabasePoolConnection {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
-
-#[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
-#[allow(unused)]
-pub fn run_migrations(
-    connection: &mut impl MigrationHarness<diesel::pg::Pg>,
-) -> Result<(), anyhow::Error> {
-    // This will run the necessary migrations.
-    //
-    // See the documentation for `MigrationHarness` for
-    // all available methods.
-    connection
-        .run_pending_migrations(MIGRATIONS)
-        .map(|_| ())
-        .map_err(|e| anyhow::Error::msg(e.to_string()))
-}
-
-#[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
-pub fn insert_user_on_auth_callback(
-    pool: self::PgPool,
-    u: super::user::User,
-) -> Result<(), anyhow::Error> {
-    let mut connection = pool.get()?;
-    diesel::insert_into(schema::users::table)
-        .values(u)
-        .on_conflict_do_nothing()
-        .execute(&mut connection)
-        .map(|_| ())
-        .map_err(|e| anyhow::Error::new(e))
-}
-#[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
-pub fn insert_auth_state_returning_id(
-    pool: self::PgPool,
-    a: super::db::auth_state::AuthState,
-) -> Result<uuid::Uuid, anyhow::Error> {
-    let mut connection = pool.get()?;
-    diesel::insert_into(schema::auth_state::table)
-        .values((
-            schema::auth_state::id.eq(a.id),
-            schema::auth_state::started.eq(a.started),
-            schema::auth_state::return_url.eq(a.return_url),
-            schema::auth_state::scope.eq(a.scope),
-            schema::auth_state::redirect_url.eq(a.redirect_url.to_string()),
-        ))
-        .returning(schema::auth_state::id)
-        .get_result(&mut connection)
-        // .optional()
-        .map_err(|e| anyhow::Error::new(e))
-}
-#[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
-
-pub async fn get_all_time_income_for_user_async() -> Result<(), anyhow::Error> {
-    todo!()
-}
-#[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
-
-pub fn get_all_time_income_for_user(
-    pool: self::PgPool,
-    user_id: &uuid::Uuid,
-) -> Result<Option<BigDecimal>, anyhow::Error> {
-    let mut connection = pool.get()?;
-    schema::transactions::table
-        .select(diesel::dsl::sum(schema::transactions::total_cost))
-        .filter(schema::transactions::total_cost.gt(<BigDecimal as bigdecimal::Zero>::zero()))
-        .filter(schema::transactions::user_id.eq(user_id))
-        .get_result(&mut connection)
-        .map_err(|e| anyhow::Error::new(e))
-}
-#[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
-
-pub fn get_all_time_expenses_for_user(
-    pool: self::PgPool,
-    user_id: &uuid::Uuid,
-) -> Result<Option<BigDecimal>, anyhow::Error> {
-    let mut connection = pool.get()?;
-    schema::transactions::table
-        .select(diesel::dsl::sum(schema::transactions::total_cost))
-        .filter(schema::transactions::total_cost.lt(<BigDecimal as bigdecimal::Zero>::zero()))
-        .filter(schema::transactions::user_id.eq(user_id))
-        .get_result(&mut connection)
-        .map_err(|e| anyhow::Error::new(e))
-}
-
-// pub async fn create_pool(
-//     database_url: &str,
-//     max_connections: usize,
-// ) -> Result<deadpool::Pool<Connection>, anyhow::Error> {
-//     let mut config = ManagerConfig::default();
-//     config.custom_setup = Box::new(establish_connection);
-//     let manager = AsyncDieselConnectionManager::<Connection>::new_with_config(database_url, config);
-//     let pool = diesel_async::pooled_connection::deadpool::Pool::builder(manager);
-//     Ok(pool.max_size(max_connections).build()?)
-// }
-
-#[cfg(all(
-    not(target_arch = "wasm32"),
-    not(target_os = "unknown"),
-    feature = "db-sync-pooled"
-))]
-pub fn create_pool<Conn>(
-    database_url: &str,
-    max_connections: u32,
-) -> Result<diesel::r2d2::Pool<diesel::r2d2::ConnectionManager<Conn>>, anyhow::Error>
-where
-    Conn: R2D2Connection + 'static,
-{
-    let manager = ConnectionManager::<Conn>::new(database_url);
-    diesel::r2d2::Pool::builder()
-        .test_on_check_out(true)
-        .max_size(max_connections)
-        .min_idle(Some(1))
-        .idle_timeout(Some(std::time::Duration::from_secs(600)))
-        .build(manager)
-        .map_err(|e| anyhow::Error::new(e))
-}
 #[cfg(all(
     not(target_arch = "wasm32"),
     not(target_os = "unknown"),
@@ -490,6 +291,53 @@ pub async fn create_pool<Conn>(
     let pool = Pool::builder(config).max_size(max_connections).build()?;
 
     Ok(pool)
+}
+#[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
+
+pub async fn get_all_time_income_for_user_async() -> Result<(), anyhow::Error> {
+    todo!()
+}
+
+#[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
+
+pub async fn test_connection(pool: self::PgPool) -> Result<usize, anyhow::Error> {
+    use diesel_async::RunQueryDsl;
+    let mut connection = pool.get().await?;
+    Ok(diesel::sql_query("SELECT TRUE").execute(&mut connection)?)
+}
+pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!();
+
+// pub async fn create_pool(
+//     database_url: &str,
+//     max_connections: usize,
+// ) -> Result<deadpool::Pool<Connection>, anyhow::Error> {
+//     let mut config = ManagerConfig::default();
+//     config.custom_setup = Box::new(establish_connection);
+//     let manager = AsyncDieselConnectionManager::<Connection>::new_with_config(database_url, config);
+//     let pool = diesel_async::pooled_connection::deadpool::Pool::builder(manager);
+//     Ok(pool.max_size(max_connections).build()?)
+// }
+
+#[cfg(all(
+    not(target_arch = "wasm32"),
+    not(target_os = "unknown"),
+    feature = "db-sync-pooled"
+))]
+pub fn create_pool<Conn>(
+    database_url: &str,
+    max_connections: u32,
+) -> Result<diesel::r2d2::Pool<diesel::r2d2::ConnectionManager<Conn>>, anyhow::Error>
+where
+    Conn: R2D2Connection + 'static,
+{
+    let manager = ConnectionManager::<Conn>::new(database_url);
+    diesel::r2d2::Pool::builder()
+        .test_on_check_out(true)
+        .max_size(max_connections)
+        .min_idle(Some(1))
+        .idle_timeout(Some(std::time::Duration::from_secs(600)))
+        .build(manager)
+        .map_err(|e| anyhow::Error::new(e))
 }
 #[cfg(all(
     not(target_arch = "wasm32"),
@@ -546,11 +394,163 @@ pub fn establish_connection(
     };
     fut.boxed()
 }
-
 #[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
 
-pub async fn test_connection(pool: self::PgPool) -> Result<usize, anyhow::Error> {
-    use diesel_async::RunQueryDsl;
-    let mut connection = pool.get().await?;
-    Ok(diesel::sql_query("SELECT TRUE").execute(&mut connection)?)
+pub fn get_all_time_expenses_for_user(
+    pool: self::PgPool,
+    user_id: &uuid::Uuid,
+) -> Result<Option<BigDecimal>, anyhow::Error> {
+    let mut connection = pool.get()?;
+    schema::transactions::table
+        .select(diesel::dsl::sum(schema::transactions::total_cost))
+        .filter(schema::transactions::total_cost.lt(<BigDecimal as bigdecimal::Zero>::zero()))
+        .filter(schema::transactions::user_id.eq(user_id))
+        .get_result(&mut connection)
+        .map_err(|e| anyhow::Error::new(e))
 }
+#[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
+
+pub fn get_all_time_income_for_user(
+    pool: self::PgPool,
+    user_id: &uuid::Uuid,
+) -> Result<Option<BigDecimal>, anyhow::Error> {
+    let mut connection = pool.get()?;
+    schema::transactions::table
+        .select(diesel::dsl::sum(schema::transactions::total_cost))
+        .filter(schema::transactions::total_cost.gt(<BigDecimal as bigdecimal::Zero>::zero()))
+        .filter(schema::transactions::user_id.eq(user_id))
+        .get_result(&mut connection)
+        .map_err(|e| anyhow::Error::new(e))
+}
+#[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
+pub fn insert_auth_state_returning_id(
+    pool: self::PgPool,
+    a: super::db::auth_state::AuthState,
+) -> Result<uuid::Uuid, anyhow::Error> {
+    let mut connection = pool.get()?;
+    diesel::insert_into(schema::auth_state::table)
+        .values((
+            schema::auth_state::id.eq(a.id),
+            schema::auth_state::started.eq(a.started),
+            schema::auth_state::return_url.eq(a.return_url),
+            schema::auth_state::scope.eq(a.scope),
+            schema::auth_state::redirect_url.eq(a.redirect_url.to_string()),
+        ))
+        .returning(schema::auth_state::id)
+        .get_result(&mut connection)
+        // .optional()
+        .map_err(|e| anyhow::Error::new(e))
+}
+
+#[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
+pub fn insert_user_on_auth_callback(
+    pool: self::PgPool,
+    u: super::user::User,
+) -> Result<(), anyhow::Error> {
+    let mut connection = pool.get()?;
+    diesel::insert_into(schema::users::table)
+        .values(u)
+        .on_conflict_do_nothing()
+        .execute(&mut connection)
+        .map(|_| ())
+        .map_err(|e| anyhow::Error::new(e))
+}
+
+#[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
+#[allow(unused)]
+pub fn run_migrations(
+    connection: &mut impl MigrationHarness<diesel::pg::Pg>,
+) -> Result<(), anyhow::Error> {
+    // This will run the necessary migrations.
+    //
+    // See the documentation for `MigrationHarness` for
+    // all available methods.
+    connection
+        .run_pending_migrations(MIGRATIONS)
+        .map(|_| ())
+        .map_err(|e| anyhow::Error::msg(e.to_string()))
+}
+
+pub mod _url;
+pub mod auth_state;
+pub mod schema;
+pub mod session;
+pub mod transactions;
+pub mod user;
+
+#[derive(Clone)]
+pub struct PrimaryDatabasePool(PgPool);
+
+pub struct PrimaryDatabasePoolConnection(PgPooledConnection);
+
+#[cfg(all(
+    not(target_arch = "wasm32"),
+    not(target_os = "unknown"),
+    feature = "db-sync-pooled"
+))]
+pub type Connection = diesel::pg::PgConnection;
+#[cfg(all(
+    not(target_arch = "wasm32"),
+    not(target_os = "unknown"),
+    feature = "db-async-pooled"
+))]
+pub type Connection = diesel_async::pg::AsyncPgConnection;
+#[cfg(all(
+    not(target_arch = "wasm32"),
+    not(target_os = "unknown"),
+    feature = "db-sync-pooled"
+))]
+pub type PgPool = Pool<diesel::pg::PgConnection>;
+#[cfg(all(
+    not(target_arch = "wasm32"),
+    not(target_os = "unknown"),
+    feature = "db-async-pooled"
+))]
+pub type PgPool = Pool<diesel_async::AsyncPgConnection>;
+
+#[cfg(all(
+    not(target_arch = "wasm32"),
+    not(target_os = "unknown"),
+    feature = "db-sync-pooled"
+))]
+pub type PgPooledConnection<Conn> =
+    diesel::r2d2::PooledConnection<diesel::r2d2::ConnectionManager<diesel::pg::Pg>>;
+#[cfg(all(
+    not(target_arch = "wasm32"),
+    not(target_os = "unknown"),
+    feature = "db-async-pooled"
+))]
+pub type PgPooledConnection =
+    diesel_async::pooled_connection::deadpool::Object<diesel_async::AsyncPgConnection>;
+
+// use std::fmt::Debug;
+// use std::io::Write;
+// use std::ops::Deref;
+#[cfg(all(
+    not(target_arch = "wasm32"),
+    not(target_os = "unknown"),
+    feature = "db-sync-pooled"
+))]
+pub type Pool<Conn> = diesel::r2d2::Pool<diesel::r2d2::ConnectionManager<Conn>>;
+#[cfg(all(
+    not(target_arch = "wasm32"),
+    not(target_os = "unknown"),
+    feature = "db-async-pooled"
+))]
+
+pub type Pool<Conn> = diesel_async::pooled_connection::deadpool::Pool<Conn>;
+
+pub use bigdecimal::BigDecimal;
+pub use columns;
+pub use diesel;
+pub use diesel_migrations::{EmbeddedMigrations, MigrationHarness};
+pub use execute;
+pub use get_result;
+pub use get_results;
+// pub fn paste::paste!{upsert_$type:snake} -> (_value:$ty) {}
+// pub fn paste::paste!{upsert_many_$type:snake}(_values:Vec<$ty>){}
+pub use implement_crud;
+
+use diesel_migrations::embed_migrations;
+
+use rocket::figment;

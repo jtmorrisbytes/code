@@ -1,60 +1,4 @@
 #![allow(warnings)]
-use crate::frontend::net::{
-    FinishWebAuthnRegistrationResponseErrorKind, StartWebAuthnRegistrationError,
-};
-use std::collections::HashMap;
-// use diesel::prelude::{Insertable, Queryable};
-// use serde::{Deserialize, Serialize};
-
-use base64::Engine;
-
-use uuid::Uuid;
-// use diesel::prelude::Insertable;
-use crate::frontend::net::{
-    FinishWebAuthnRegistrationBody, FinishWebAuthnRegistrationResponseBody,
-    StartWebAuthnRegistrationResponse, StartWebAuthnRegistrationResponseBody,
-};
-use rocket::{
-    http::Status,
-    response::content::{RawHtml, RawMsgPack},
-    serde::msgpack::MsgPack,
-    State,
-};
-use webauthn_rs::{prelude::PasskeyRegistration, Webauthn};
-// use webauthn_rs::prelude::CreationChallengeResponse;
-
-// #[derive()]
-// #[diesel(table_name=schema::passkey_registration_states)]
-pub struct PasskeyRegistrationState {
-    // id: uuid::Uuid,
-    username: String,
-    user_id: Uuid,
-    passkey_registration: PasskeyRegistration,
-}
-// #[derive(Serialize,Deserialize,Queryable,Insertable)]
-// #[diesel(table_name=schema::users_passkeys)]
-pub struct UsersPasskeys {
-    id: uuid::Uuid,
-    user_id: uuid::Uuid,
-    credential_id: Vec<u8>,
-}
-
-#[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
-#[derive(Default)]
-pub struct PasskeyRegistrationStateMemory(
-    rocket::tokio::sync::Mutex<HashMap<Uuid, PasskeyRegistrationState>>,
-);
-
-// WEBAUTHN
-
-// use webauthn_rs::prelude::*;
-
-pub const WEBAUTHN_RELYING_PARTY_ID: &str = "webauthn.relying_party_id";
-pub const WEBAUTHN_RELYING_PARTY_PORT: &str = "webauthn.relying_party_port";
-pub const WEBAUTHN_RELYING_PARTY_URL: &str = "webauthn.relying_party_url";
-pub const WEBAUTHN_RELYING_PARTY_NAME: &str = "webauthn.relying_party_name";
-
-pub struct WebAuthnFairing;
 
 #[rocket::async_trait]
 impl rocket::fairing::Fairing for WebAuthnFairing {
@@ -119,6 +63,54 @@ impl rocket::fairing::Fairing for WebAuthnFairing {
         };
         Ok(rocket.manage(webauthn))
     }
+}
+
+#[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
+#[rocket::post(
+    "/authentication/finish-webauthn-registration",
+    data = "<body>",
+    format = "msgpack"
+)]
+pub async fn finish_webauthn_registration(
+    body: MsgPack<FinishWebAuthnRegistrationBody>,
+    registration_state: &State<PasskeyRegistrationStateMemory>,
+    webauthn: &State<Webauthn>,
+) -> MsgPack<FinishWebAuthnRegistrationResponseBody> {
+    // use schema;
+    // use diesel::prelude::*;
+
+    let passkey_state = {
+        let mut lock = registration_state.0.lock().await;
+        lock.remove(&body.passkey_state_id)
+    };
+
+    if passkey_state.is_none() {
+        // invaid uuid or repeated request
+        return MsgPack(FinishWebAuthnRegistrationResponseBody::Err(
+            FinishWebAuthnRegistrationResponseErrorKind::InvalidPasskeyState,
+        ));
+    }
+    let passkey_state = passkey_state.unwrap();
+
+    // get the users credentials
+    let passkey = match webauthn.finish_passkey_registration(
+        &body.public_key_request,
+        &passkey_state.passkey_registration,
+    ) {
+        Ok(passkey) => passkey,
+        Err(webauthn_error) => {
+            tracing::error!("{webauthn_error}");
+            return MsgPack(FinishWebAuthnRegistrationResponseBody::Err(
+                FinishWebAuthnRegistrationResponseErrorKind::WebAuthnError(
+                    webauthn_error.to_string(),
+                ),
+            ));
+        }
+    };
+    // webauthn says that we need to check if this credential id is registered to another user
+    passkey.cred_id();
+    // schema::users_passkeys
+    MsgPack(FinishWebAuthnRegistrationResponseBody::Ok(()))
 }
 
 // use crate::frontend::FrontendTemplatePath;
@@ -234,50 +226,58 @@ pub async fn start_webauthn_registration(
         })
 }
 
+// WEBAUTHN
+
+// use webauthn_rs::prelude::*;
+
+pub const WEBAUTHN_RELYING_PARTY_ID: &str = "webauthn.relying_party_id";
+pub const WEBAUTHN_RELYING_PARTY_NAME: &str = "webauthn.relying_party_name";
+pub const WEBAUTHN_RELYING_PARTY_PORT: &str = "webauthn.relying_party_port";
+pub const WEBAUTHN_RELYING_PARTY_URL: &str = "webauthn.relying_party_url";
+
 #[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
-#[rocket::post(
-    "/authentication/finish-webauthn-registration",
-    data = "<body>",
-    format = "msgpack"
-)]
-pub async fn finish_webauthn_registration(
-    body: MsgPack<FinishWebAuthnRegistrationBody>,
-    registration_state: &State<PasskeyRegistrationStateMemory>,
-    webauthn: &State<Webauthn>,
-) -> MsgPack<FinishWebAuthnRegistrationResponseBody> {
-    // use schema;
-    // use diesel::prelude::*;
+#[derive(Default)]
+pub struct PasskeyRegistrationStateMemory(
+    rocket::tokio::sync::Mutex<HashMap<Uuid, PasskeyRegistrationState>>,
+);
+// use webauthn_rs::prelude::CreationChallengeResponse;
 
-    let passkey_state = {
-        let mut lock = registration_state.0.lock().await;
-        lock.remove(&body.passkey_state_id)
-    };
-
-    if passkey_state.is_none() {
-        // invaid uuid or repeated request
-        return MsgPack(FinishWebAuthnRegistrationResponseBody::Err(
-            FinishWebAuthnRegistrationResponseErrorKind::InvalidPasskeyState,
-        ));
-    }
-    let passkey_state = passkey_state.unwrap();
-
-    // get the users credentials
-    let passkey = match webauthn.finish_passkey_registration(
-        &body.public_key_request,
-        &passkey_state.passkey_registration,
-    ) {
-        Ok(passkey) => passkey,
-        Err(webauthn_error) => {
-            tracing::error!("{webauthn_error}");
-            return MsgPack(FinishWebAuthnRegistrationResponseBody::Err(
-                FinishWebAuthnRegistrationResponseErrorKind::WebAuthnError(
-                    webauthn_error.to_string(),
-                ),
-            ));
-        }
-    };
-    // webauthn says that we need to check if this credential id is registered to another user
-    passkey.cred_id();
-    // schema::users_passkeys
-    MsgPack(FinishWebAuthnRegistrationResponseBody::Ok(()))
+// #[derive()]
+// #[diesel(table_name=schema::passkey_registration_states)]
+pub struct PasskeyRegistrationState {
+    // id: uuid::Uuid,
+    username: String,
+    user_id: Uuid,
+    passkey_registration: PasskeyRegistration,
 }
+// #[derive(Serialize,Deserialize,Queryable,Insertable)]
+// #[diesel(table_name=schema::users_passkeys)]
+pub struct UsersPasskeys {
+    id: uuid::Uuid,
+    user_id: uuid::Uuid,
+    credential_id: Vec<u8>,
+}
+
+pub struct WebAuthnFairing;
+// use diesel::prelude::{Insertable, Queryable};
+// use serde::{Deserialize, Serialize};
+
+use base64::Engine;
+// use diesel::prelude::Insertable;
+use crate::frontend::net::{
+    FinishWebAuthnRegistrationBody, FinishWebAuthnRegistrationResponseBody,
+    StartWebAuthnRegistrationResponse, StartWebAuthnRegistrationResponseBody,
+};
+use crate::frontend::net::{
+    FinishWebAuthnRegistrationResponseErrorKind, StartWebAuthnRegistrationError,
+};
+use rocket::{
+    http::Status,
+    response::content::{RawHtml, RawMsgPack},
+    serde::msgpack::MsgPack,
+    State,
+};
+use std::collections::HashMap;
+
+use uuid::Uuid;
+use webauthn_rs::{prelude::PasskeyRegistration, Webauthn};

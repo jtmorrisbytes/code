@@ -1,118 +1,15 @@
-/*
-** Copyright 2015-2024 The Khronos Group Inc.
-**
-** SPDX-License-Identifier: Apache-2.0
-*/
-// code ported from vulkan headers in libvulkan-dev
-
 #[cfg(target_os = "linux")]
-pub mod linux;
-#[cfg(target_os = "windows")]
-pub mod win32;
-#[allow(non_snake_case)]
-pub const fn VK_MAKE_API_VERSION(variant: u32, major: u32, minor: u32, patch: u32) -> u32 {
-    (variant << 29_u32) | (major << 22_u32) | (minor << 12_u32) | patch
-}
-pub const VK_API_VERSION_1_0: u32 = VK_MAKE_API_VERSION(0, 1, 0, 0);
-
-pub mod bindings;
-pub mod custom_impls;
-pub struct VkInstance {
-    ptr: bindings::VkInstance,
-    loader: Loader,
-}
-impl VkInstance {
-    pub fn as_ptr(&self) -> bindings::VkInstance {
-        self.ptr
+fn _dlerror() -> Option<String> {
+    let err = unsafe { dlerror() };
+    if err.is_null() {
+        return None;
     }
-    pub fn destroy(self) -> Result<(), String> {
-        self.loader
-            .vk_destroy_instance(self.ptr, std::ptr::null())?;
-        Ok(())
-    }
-    pub fn create_instance(create_info: &bindings::VkInstanceCreateInfo) -> Result<Self, String> {
-        let loader = Loader::try_new()?;
-        let ptr = loader.vk_create_instance(create_info, None)?;
-
-        Ok(Self { ptr, loader })
-    }
-    pub fn vk_enumerate_instance_extension_properties(
-        &self,
-        layer_name: Option<&str>,
-    ) -> Result<Vec<bindings::VkExtensionProperties>, String> {
-        self.loader
-            .vk_enumerate_instance_extension_properties(Some(self.ptr), layer_name)
-    }
-    pub fn vk_enumerate_instance_layer_properties(
-        &self,
-    ) -> Result<Vec<bindings::VkLayerProperties>, String> {
-        self.loader
-            .vk_enumerate_instance_layer_properties(Some(self.ptr))
-    }
-    pub fn get_required_extensions_for_drawing_into_window(&self) -> Vec<&std::ffi::CStr> {
-        cfg_if::cfg_if! {
-           if #[cfg(target_os="windows")] {
-            vec![self::win32::VK_KHR_WIN32_SURFACE_EXTENSION_NAME]
-        }
-        else if #[cfg(target_os="linux")] {
-            let xdg_session_type = std::env::var("XDG_SESSION_TYPE").unwrap_or(String::from("x11"));
-            let s = xdg_session_type.as_str();
-            match s {
-                "x11" =>vec![self::linux::VK_KHR_XLIB_SURFACE_EXTENSION_NAME],
-                "wayland" =>vec![self::linux::VK_KHR_WAYLAND_SURFACE_EXTENSION_NAME],
-                "unspecified" =>vec![],
-                // text session
-                "tty" =>vec![],
-                // MIR display server?
-                "mir" =>vec![],
-                // a web (browser?) based session?
-                "web" => vec![],
-                unknown => {
-
-                    println!("'{unknown}' is an unknown XDG_SESSION_TYPE. creating a window may not work");
-                    vec![]
-                }
-
-            }
-
-        }
-        else if #[cfg(target_os="macos")] {
-            vec![]
-        }
-        else if #[cfg(target_os="android")] {
-            vec![]
-        }
-        else {
-            println!("This is an unknown or unhandled target operating system: {}. returning an empty list",env!("CARGO_CFG_TARGET_OS"));
-            vec![]
-        }
-        }
-    }
-}
-// impl Drop for VkInstance {
-//     /// dont forget to destroy all child objects before letting this drop
-//     fn drop(&mut self) {
-//         let _  =self.loader.vk_destroy_instance(self.ptr,std::ptr::null()).inspect_err(|e| eprintln!("{}",e));
-//         // let _ = self.destroy();
-//     }
-// }
-
-// attempt to load the vulkan api from the vulkan library at runtime.
-
-// dynamically loads the vulkan loader function from platform apis
-
-#[cfg(target_os = "linux")]
-unsafe extern "C" {
-    pub unsafe fn dlopen(
-        filename: *const std::ffi::c_char,
-        flags: std::ffi::c_int,
-    ) -> *mut std::ffi::c_void;
-    pub unsafe fn dlerror() -> *const std::ffi::c_char;
-    pub unsafe fn dlclose(handle: *mut std::ffi::c_void);
-    pub unsafe fn dlsym(
-        handle: *mut std::ffi::c_void,
-        symbol: *const std::ffi::c_char,
-    ) -> *mut std::ffi::c_void;
+    let cstr = unsafe { std::ffi::CStr::from_ptr(err) };
+    let str = cstr
+        .to_str()
+        .expect("Valid UTF-8 or ANSI sequence from C function dlerror()");
+    let string = str.to_string();
+    Some(string)
 }
 fn _dlopen(path: &str) -> Result<*mut std::ffi::c_void, String> {
     cfg_if::cfg_if! {
@@ -134,74 +31,6 @@ fn _dlopen(path: &str) -> Result<*mut std::ffi::c_void, String> {
             compile_error!("function _dlopen is not implemented for {}!",env!("CARGO_CFG_TARGET_OS"))
         }
     }
-}
-#[cfg(target_os = "linux")]
-fn _dlerror() -> Option<String> {
-    let err = unsafe { dlerror() };
-    if err.is_null() {
-        return None;
-    }
-    let cstr = unsafe { std::ffi::CStr::from_ptr(err) };
-    let str = cstr
-        .to_str()
-        .expect("Valid UTF-8 or ANSI sequence from C function dlerror()");
-    let string = str.to_string();
-    Some(string)
-}
-
-unsafe fn _dlsym(
-    handle: *mut std::ffi::c_void,
-    symbol_name: &str,
-) -> Result<*mut std::ffi::c_void, String> {
-    if handle.is_null() {
-        return Err(format!("Receved null pointer from rust function while trying to look up a symbol: {symbol_name}"));
-    }
-    cfg_if::cfg_if! {
-        if #[cfg(target_os="linux")] {
-
-            let symbol_cstr = std::ffi::CString::new(symbol_name).map_err(|e| e.to_string())?;
-            let p_symbol = unsafe { dlsym(handle, symbol_cstr.as_ptr()) };
-            if p_symbol.is_null() {
-                let error = _dlerror().unwrap_or_else(||{format!("Recieved null pointer from C function dlsym() while trying to look up a symbol {symbol_name}. No error message is available")});
-                return Err(error);
-            }
-            Ok(p_symbol)
-        }
-        else if #[cfg(target_os="windows")] {
-            // dll loading errors should be handled by windows::core::Error::from_win32
-            self::win32::_dlsym(handle,symbol_name)
-        }
-        else {
-            compile_error!("_dlsym is not implemented for target_os='{}'. implement id",env!("CARGO_CFG_TARGET_OS"))
-        }
-    }
-}
-pub struct Loader {
-    shared_object: *mut std::ffi::c_void,
-    pfn_vk_get_instance_proc_address: crate::bindings::PFN_vkGetInstanceProcAddr,
-    // pfn_vk_create_instance: crate::bindings::PFN_vkCreateInstance
-}
-// impl Drop for Loader {
-//     fn drop(&mut self) {
-//         unsafe { dlclose(self.shared_object) };
-//     }
-// }
-// macro_rules! transmute {
-//     ($ptr:ident,$t:ty) => {
-//         unsafe {
-//             let __ptr = $ptr as *const ();
-//             std::mem::transmute::<_, $t>(__ptr)
-//         }
-//     };
-// }
-unsafe fn transmute<T>(ptr: *mut std::ffi::c_void) -> T {
-    let _ptr = ptr as *const ();
-    unsafe { std::mem::transmute_copy::<_, T>(&*_ptr) }
-}
-unsafe fn load_symbol<T>(handle: *mut std::ffi::c_void, symbol_name: &str) -> Result<T, String> {
-    let ptr = unsafe { _dlsym(handle, symbol_name) }?;
-    let t = unsafe { transmute::<T>(ptr) };
-    Ok(t)
 }
 
 impl Loader {
@@ -235,9 +64,9 @@ impl Loader {
         }
         // load all essential functions
         let pfn_vk_createinstance = unsafe { _dlsym(shared_object, "vkGetInstanceProcAddr")? };
-        let pfn_vk_get_instance_proc_addr = unsafe {transmute::<crate::bindings::PFN_vkGetInstanceProcAddr>(
-            pfn_vk_createinstance,
-        )}
+        let pfn_vk_get_instance_proc_addr = unsafe {
+            transmute::<crate::bindings::PFN_vkGetInstanceProcAddr>(pfn_vk_createinstance)
+        }
         .ok_or("Failed to get pointer to vkCreateInstance".to_string())?;
         Ok(Self {
             shared_object,
@@ -443,6 +272,79 @@ impl Loader {
         Ok(properties)
     }
 }
+impl VkInstance {
+    pub fn as_ptr(&self) -> bindings::VkInstance {
+        self.ptr
+    }
+    pub fn destroy(self) -> Result<(), String> {
+        self.loader
+            .vk_destroy_instance(self.ptr, std::ptr::null())?;
+        Ok(())
+    }
+    pub fn create_instance(create_info: &bindings::VkInstanceCreateInfo) -> Result<Self, String> {
+        let loader = Loader::try_new()?;
+        let ptr = loader.vk_create_instance(create_info, None)?;
+
+        Ok(Self { ptr, loader })
+    }
+    pub fn vk_enumerate_instance_extension_properties(
+        &self,
+        layer_name: Option<&str>,
+    ) -> Result<Vec<bindings::VkExtensionProperties>, String> {
+        self.loader
+            .vk_enumerate_instance_extension_properties(Some(self.ptr), layer_name)
+    }
+    pub fn vk_enumerate_instance_layer_properties(
+        &self,
+    ) -> Result<Vec<bindings::VkLayerProperties>, String> {
+        self.loader
+            .vk_enumerate_instance_layer_properties(Some(self.ptr))
+    }
+    pub fn get_required_extensions_for_drawing_into_window(&self) -> Vec<&std::ffi::CStr> {
+        cfg_if::cfg_if! {
+           if #[cfg(target_os="windows")] {
+            vec![self::win32::VK_KHR_WIN32_SURFACE_EXTENSION_NAME]
+        }
+        else if #[cfg(target_os="linux")] {
+            let xdg_session_type = std::env::var("XDG_SESSION_TYPE").unwrap_or(String::from("x11"));
+            let s = xdg_session_type.as_str();
+            match s {
+                "x11" =>vec![self::linux::VK_KHR_XLIB_SURFACE_EXTENSION_NAME],
+                "wayland" =>vec![self::linux::VK_KHR_WAYLAND_SURFACE_EXTENSION_NAME],
+                "unspecified" =>vec![],
+                // text session
+                "tty" =>vec![],
+                // MIR display server?
+                "mir" =>vec![],
+                // a web (browser?) based session?
+                "web" => vec![],
+                unknown => {
+
+                    println!("'{unknown}' is an unknown XDG_SESSION_TYPE. creating a window may not work");
+                    vec![]
+                }
+
+            }
+
+        }
+        else if #[cfg(target_os="macos")] {
+            vec![]
+        }
+        else if #[cfg(target_os="android")] {
+            vec![]
+        }
+        else {
+            println!("This is an unknown or unhandled target operating system: {}. returning an empty list",env!("CARGO_CFG_TARGET_OS"));
+            vec![]
+        }
+        }
+    }
+}
+pub const VK_API_VERSION_1_0: u32 = VK_MAKE_API_VERSION(0, 1, 0, 0);
+#[allow(non_snake_case)]
+pub const fn VK_MAKE_API_VERSION(variant: u32, major: u32, minor: u32, patch: u32) -> u32 {
+    (variant << 29_u32) | (major << 22_u32) | (minor << 12_u32) | patch
+}
 
 #[test]
 pub fn test_libappvulkan_loader() -> Result<(), Box<dyn std::error::Error>> {
@@ -472,4 +374,102 @@ pub fn test_libappvulkan_loader_enumerate_layer_properties(
     let properties = loader.vk_enumerate_instance_layer_properties(None)?;
     println!("{properties:?}");
     Ok(())
+}
+
+pub mod bindings;
+pub mod custom_impls;
+/*
+** Copyright 2015-2024 The Khronos Group Inc.
+**
+** SPDX-License-Identifier: Apache-2.0
+*/
+// code ported from vulkan headers in libvulkan-dev
+
+#[cfg(target_os = "linux")]
+pub mod linux;
+#[cfg(target_os = "windows")]
+pub mod win32;
+pub struct Loader {
+    shared_object: *mut std::ffi::c_void,
+    pfn_vk_get_instance_proc_address: crate::bindings::PFN_vkGetInstanceProcAddr,
+    // pfn_vk_create_instance: crate::bindings::PFN_vkCreateInstance
+}
+pub struct VkInstance {
+    ptr: bindings::VkInstance,
+    loader: Loader,
+}
+// impl Drop for VkInstance {
+//     /// dont forget to destroy all child objects before letting this drop
+//     fn drop(&mut self) {
+//         let _  =self.loader.vk_destroy_instance(self.ptr,std::ptr::null()).inspect_err(|e| eprintln!("{}",e));
+//         // let _ = self.destroy();
+//     }
+// }
+
+// attempt to load the vulkan api from the vulkan library at runtime.
+
+// dynamically loads the vulkan loader function from platform apis
+
+#[cfg(target_os = "linux")]
+unsafe extern "C" {
+    pub unsafe fn dlopen(
+        filename: *const std::ffi::c_char,
+        flags: std::ffi::c_int,
+    ) -> *mut std::ffi::c_void;
+    pub unsafe fn dlerror() -> *const std::ffi::c_char;
+    pub unsafe fn dlclose(handle: *mut std::ffi::c_void);
+    pub unsafe fn dlsym(
+        handle: *mut std::ffi::c_void,
+        symbol: *const std::ffi::c_char,
+    ) -> *mut std::ffi::c_void;
+}
+
+unsafe fn _dlsym(
+    handle: *mut std::ffi::c_void,
+    symbol_name: &str,
+) -> Result<*mut std::ffi::c_void, String> {
+    if handle.is_null() {
+        return Err(format!("Receved null pointer from rust function while trying to look up a symbol: {symbol_name}"));
+    }
+    cfg_if::cfg_if! {
+        if #[cfg(target_os="linux")] {
+
+            let symbol_cstr = std::ffi::CString::new(symbol_name).map_err(|e| e.to_string())?;
+            let p_symbol = unsafe { dlsym(handle, symbol_cstr.as_ptr()) };
+            if p_symbol.is_null() {
+                let error = _dlerror().unwrap_or_else(||{format!("Recieved null pointer from C function dlsym() while trying to look up a symbol {symbol_name}. No error message is available")});
+                return Err(error);
+            }
+            Ok(p_symbol)
+        }
+        else if #[cfg(target_os="windows")] {
+            // dll loading errors should be handled by windows::core::Error::from_win32
+            self::win32::_dlsym(handle,symbol_name)
+        }
+        else {
+            compile_error!("_dlsym is not implemented for target_os='{}'. implement id",env!("CARGO_CFG_TARGET_OS"))
+        }
+    }
+}
+unsafe fn load_symbol<T>(handle: *mut std::ffi::c_void, symbol_name: &str) -> Result<T, String> {
+    let ptr = unsafe { _dlsym(handle, symbol_name) }?;
+    let t = unsafe { transmute::<T>(ptr) };
+    Ok(t)
+}
+// impl Drop for Loader {
+//     fn drop(&mut self) {
+//         unsafe { dlclose(self.shared_object) };
+//     }
+// }
+// macro_rules! transmute {
+//     ($ptr:ident,$t:ty) => {
+//         unsafe {
+//             let __ptr = $ptr as *const ();
+//             std::mem::transmute::<_, $t>(__ptr)
+//         }
+//     };
+// }
+unsafe fn transmute<T>(ptr: *mut std::ffi::c_void) -> T {
+    let _ptr = ptr as *const ();
+    unsafe { std::mem::transmute_copy::<_, T>(&*_ptr) }
 }

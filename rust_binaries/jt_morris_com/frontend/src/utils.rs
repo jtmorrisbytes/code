@@ -1,12 +1,86 @@
-use std::{fmt::format, future::Future};
+pub(crate) async fn register_public_key(
+    body: FinishWebAuthnRegistrationBody,
+    setter: UseStateSetter<StartAuthenticationUIState>,
+) {
+    request::<FinishWebAuthnRegistrationBody, (), _, _>(
+        "POST".to_string(),
+        "/authentication/finish-webauthn-registration".to_string(),
+        Some(body),
+        |request_result| async move {
+            match request_result {
+                Ok(()) => setter.set(StartAuthenticationUIState::WaitingForInput { error: None }),
+                Err(e) => {
+                    let error = e.as_string().unwrap_or_default();
+                    let error_message = format!("Failed to register public key: {error}");
+                    web_sys::console::error_2(&JsValue::from_str(&error_message), &e);
+                    setter.set(StartAuthenticationUIState::WaitingForInput {
+                        error: Some(error_message),
+                    })
+                }
+            }
+        },
+    );
+}
 
-use js_sys::{ArrayBuffer, Uint8Array};
-use serde::{Deserialize, Serialize};
-use wasm_bindgen::{JsCast, JsValue};
-use wasm_bindgen_futures::JsFuture;
-use web_sys::{Request, RequestInit};
-use webauthn_rs_proto::RegisterPublicKeyCredential;
-use yew::UseStateSetter;
+pub(crate) fn perform_ccr_request(
+    ccr_url: String,
+    username: String,
+    setter: UseStateSetter<StartAuthenticationUIState>,
+) {
+    let url = format!("{ccr_url}?username={username}");
+    //    perform the ccr request
+    request::<(), StartWebAuthnRegistrationResponse, _, _>(
+        "POST".to_string(),
+        url.to_string(),
+        None,
+        |r| async move {
+            let response = match r {
+                Ok(response) => response,
+                Err(e) => {
+                    let error = e.as_string().unwrap_or_default();
+                    let error_message = format!("Error while performing ccr request: {error}");
+                    web_sys::console::log_2(&JsValue::from_str(&error_message), &e);
+                    setter.set(StartAuthenticationUIState::WaitingForInput {
+                        error: Some(error_message),
+                    });
+                    return;
+                }
+            };
+            // return early if the request is successful after updating the applicaton state. otherwise handle the errors
+            static ERROR_PREFIX: &str = "CCR request failed";
+            let error_message = match response {
+                StartWebAuthnRegistrationResponse::Ok {
+                    passkey_state_id,
+                    ccr,
+                } => {
+                    setter.set(StartAuthenticationUIState::RegisteringChallenge {
+                        passkey_state_id,
+                        ccr,
+                    });
+                    return;
+                }
+                StartWebAuthnRegistrationResponse::DatabaseConnectionFailed(m) => {
+                    format!("{ERROR_PREFIX}: database connection failed: {m}")
+                }
+                StartWebAuthnRegistrationResponse::MissingUsername => {
+                    format!("{ERROR_PREFIX}: Missing request parameter username")
+                }
+                StartWebAuthnRegistrationResponse::UsernameLookupFailed(m) => {
+                    format!("{ERROR_PREFIX}: username lookup failed: {m}")
+                }
+                StartWebAuthnRegistrationResponse::WebAuthnError(m) => {
+                    format!("{ERROR_PREFIX}: Webauthn Error: {m}")
+                }
+            };
+            web_sys::console::error_1(&JsValue::from_str(&error_message));
+            setter.set(StartAuthenticationUIState::WaitingForInput {
+                error: Some(error_message),
+            });
+        },
+    )
+}
+pub(crate) static FAILED_TO_GET_WINDOW_OBJECT: &str =
+    "Failed to get a reference to the window object";
 /// makes a fetch request and serializes and deserializes the response with msgpack. reduces boilerplate
 pub fn request<Body, Output, Callback, Fut>(
     method: String,
@@ -114,86 +188,12 @@ use crate::{
     types::{FinishWebAuthnRegistrationBody, StartWebAuthnRegistrationResponse},
     StartAuthenticationUIState,
 };
-pub(crate) static FAILED_TO_GET_WINDOW_OBJECT: &str =
-    "Failed to get a reference to the window object";
 
-pub(crate) fn perform_ccr_request(
-    ccr_url: String,
-    username: String,
-    setter: UseStateSetter<StartAuthenticationUIState>,
-) {
-    let url = format!("{ccr_url}?username={username}");
-    //    perform the ccr request
-    request::<(), StartWebAuthnRegistrationResponse, _, _>(
-        "POST".to_string(),
-        url.to_string(),
-        None,
-        |r| async move {
-            let response = match r {
-                Ok(response) => response,
-                Err(e) => {
-                    let error = e.as_string().unwrap_or_default();
-                    let error_message = format!("Error while performing ccr request: {error}");
-                    web_sys::console::log_2(&JsValue::from_str(&error_message), &e);
-                    setter.set(StartAuthenticationUIState::WaitingForInput {
-                        error: Some(error_message),
-                    });
-                    return;
-                }
-            };
-            // return early if the request is successful after updating the applicaton state. otherwise handle the errors
-            static ERROR_PREFIX: &str = "CCR request failed";
-            let error_message = match response {
-                StartWebAuthnRegistrationResponse::Ok {
-                    passkey_state_id,
-                    ccr,
-                } => {
-                    setter.set(StartAuthenticationUIState::RegisteringChallenge {
-                        passkey_state_id,
-                        ccr,
-                    });
-                    return;
-                }
-                StartWebAuthnRegistrationResponse::DatabaseConnectionFailed(m) => {
-                    format!("{ERROR_PREFIX}: database connection failed: {m}")
-                }
-                StartWebAuthnRegistrationResponse::MissingUsername => {
-                    format!("{ERROR_PREFIX}: Missing request parameter username")
-                }
-                StartWebAuthnRegistrationResponse::UsernameLookupFailed(m) => {
-                    format!("{ERROR_PREFIX}: username lookup failed: {m}")
-                }
-                StartWebAuthnRegistrationResponse::WebAuthnError(m) => {
-                    format!("{ERROR_PREFIX}: Webauthn Error: {m}")
-                }
-            };
-            web_sys::console::error_1(&JsValue::from_str(&error_message));
-            setter.set(StartAuthenticationUIState::WaitingForInput {
-                error: Some(error_message),
-            });
-        },
-    )
-}
-pub(crate) async fn register_public_key(
-    body: FinishWebAuthnRegistrationBody,
-    setter: UseStateSetter<StartAuthenticationUIState>,
-) {
-    request::<FinishWebAuthnRegistrationBody, (), _, _>(
-        "POST".to_string(),
-        "/authentication/finish-webauthn-registration".to_string(),
-        Some(body),
-        |request_result| async move {
-            match request_result {
-                Ok(()) => setter.set(StartAuthenticationUIState::WaitingForInput { error: None }),
-                Err(e) => {
-                    let error = e.as_string().unwrap_or_default();
-                    let error_message = format!("Failed to register public key: {error}");
-                    web_sys::console::error_2(&JsValue::from_str(&error_message), &e);
-                    setter.set(StartAuthenticationUIState::WaitingForInput {
-                        error: Some(error_message),
-                    })
-                }
-            }
-        },
-    );
-}
+use js_sys::{ArrayBuffer, Uint8Array};
+use serde::{Deserialize, Serialize};
+use std::{fmt::format, future::Future};
+use wasm_bindgen::{JsCast, JsValue};
+use wasm_bindgen_futures::JsFuture;
+use web_sys::{Request, RequestInit};
+use webauthn_rs_proto::RegisterPublicKeyCredential;
+use yew::UseStateSetter;

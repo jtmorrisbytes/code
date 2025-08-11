@@ -1,14 +1,111 @@
-use std::ffi::CString;
-
-use ash::prelude::*;
-use ash::{Entry, EntryFnV1_0, InstanceFnV1_0, vk};
-use raw_window_handle::{HasDisplayHandle, HasWindowHandle, RawDisplayHandle, RawWindowHandle};
-
-pub struct VulkanSurface {
-    surface_loader: ash::khr::surface::Instance,
-    surface: ash::vk::SurfaceKHR,
+impl Drop for VkLogicalDevice {
+    fn drop(&mut self) {
+        unsafe {
+            self.device.destroy_device(None);
+        }
+    }
 }
-impl VulkanSurface {
+impl Drop for VkPhysicalDevice {
+    fn drop(&mut self) {}
+}
+impl Drop for VkSurface {
+    fn drop(&mut self) {
+        unsafe {
+            self.surface_loader.destroy_surface(self.surface, None);
+        }
+    }
+}
+impl Drop for self::VKInstance {
+    fn drop(&mut self) {
+        unsafe { self.instance.destroy_instance(None) }
+    }
+}
+impl QueueFamilyIndicies {
+    fn is_complete(&self, need_present: bool) -> bool {
+        self.graphics_family != u32::MAX && (!need_present || self.present_family.is_some())
+    }
+    fn find_queue_families(
+        vk_instance: &VKInstance,
+        device: vk::PhysicalDevice,
+        surface: Option<&VkSurface>,
+    ) -> Self {
+        let families = vk_instance.get_physical_device_queue_family_properties(device);
+
+        let mut graphics_family = None;
+        let mut present_family = None;
+
+        for (index, family) in families.iter().enumerate() {
+            if family.queue_flags.contains(vk::QueueFlags::GRAPHICS) {
+                graphics_family = Some(index as u32);
+            }
+            if let Some(surface) = surface {
+                let supports_present =
+                    surface.get_physical_device_surface_support(device, index as u32);
+                if supports_present {
+                    present_family = Some(index as u32)
+                }
+            }
+        }
+        Self {
+            graphics_family: graphics_family
+                .expect("Expected to find a graphics family queue index but was none"),
+            present_family,
+        }
+    }
+}
+impl VkLogicalDevice {
+    fn new(device: ash::Device) -> Self {
+        Self { device }
+    }
+}
+
+impl VkPhysicalDevice {
+    pub fn pick_physical_device(vk_instance: &VKInstance, surface: Option<&VkSurface>) -> Self {
+        let physical_devices = vk_instance.enumerate_physical_devices().expect(
+            "Failed to enumerate physical devices for VkPhysicalDevice::pick_physical_devices",
+        );
+        let physical_devices: Vec<_> = physical_devices
+            .clone()
+            .into_iter()
+            .filter_map(|physical_device| {
+                // compile_error!("finish picking physical devices")
+                let properties = vk_instance.get_physical_device_properties(physical_device);
+
+                let indices =
+                    QueueFamilyIndicies::find_queue_families(vk_instance, physical_device, surface);
+                if indices.is_complete(surface.is_some()) {
+                    Some((physical_device, indices))
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        if physical_devices.len() == 0 {
+            panic!("Expected support for physical device but no physical devices are available")
+        }
+        let (physical_device, qf) = physical_devices[0];
+        Self {
+            physical_device,
+            queue_family_indicies: qf,
+        }
+    }
+}
+impl VkSurface {
+    pub fn get_physical_device_surface_support(
+        &self,
+        physical_device: vk::PhysicalDevice,
+        queue_family_index: u32,
+    ) -> bool {
+        unsafe {
+            self.surface_loader.get_physical_device_surface_support(
+                physical_device,
+                queue_family_index,
+                self.surface,
+            )
+        }
+        .unwrap_or(false)
+    }
     // handles the platform specific surface creation code
 
     pub fn create_from_handles(
@@ -16,7 +113,7 @@ impl VulkanSurface {
         instance: &ash::Instance,
         window_handle: RawWindowHandle,
         display_handle: RawDisplayHandle,
-    ) -> Result<VulkanSurface, Box<dyn std::error::Error>> {
+    ) -> Result<VkSurface, Box<dyn std::error::Error>> {
         let surface_loader = ash::khr::surface::Instance::new(entry, instance);
 
         // handle all possible combinations of window handle and display handle combination
@@ -39,25 +136,127 @@ impl VulkanSurface {
     }
     pub fn create_headless() {}
 }
-impl Drop for VulkanSurface {
-    fn drop(&mut self) {
-        unsafe {
-            self.surface_loader.destroy_surface(self.surface, None);
+
+impl VulkanBackend {
+    pub fn new() -> Self {
+        let entry = unsafe { ash::Entry::load() }.unwrap();
+
+        Self {
+            instance: None,
+            entry,
         }
     }
-}
 
-pub struct VulkanInstance {
-    entry: ash::Entry,
-    surface: Option<VulkanSurface>,
-    instance: ash::Instance,
-}
-impl Drop for self::VulkanInstance {
-    fn drop(&mut self) {
-        unsafe { self.instance.destroy_instance(None) }
+    pub fn initialize(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        // loads the vulkan library
+        let mut extensions = vec![ash::khr::surface::NAME.as_ptr()];
+        #[cfg(target_os = "windows")]
+        {
+            extensions.push(ash::khr::win32_surface::NAME.as_ptr())
+        }
+        #[cfg(unix)]
+        {
+            extensions.push(ash::khr::xlib_surface::NAME.as_ptr())
+        }
+        let layers = vec![];
+
+        let instance = VKInstance::create(
+            "Vulkan App",
+            "Jordan's basic vulkan engine",
+            layers.as_slice(),
+            extensions.as_slice(),
+        )?;
+        self.instance.replace(instance);
+        Ok(())
+    }
+    pub fn instance_create_surface(
+        &mut self,
+        window_handle: RawWindowHandle,
+        display_handle: RawDisplayHandle,
+    ) -> Result<(), Box<dyn std::error::Error>>
+where {
+        if self.instance.is_none() {
+            return Err("Vulkan Instance has not been intialized yet".into());
+        }
+        let instance = self.instance.as_mut().unwrap();
+        instance.create_surface(window_handle, display_handle)
+    }
+    pub fn instance_destroy_surface(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        if self.instance.is_none() {
+            return Err("Vulkan Instance has not been intialized before the call to VulkanBackend::instance_destroy_surfce(&mut self)".into());
+        }
+        let instance = self.instance.as_mut().unwrap();
+        instance.destroy_surface();
+        Ok(())
+    }
+    pub fn pick_physical_device_and_queues(&mut self) {
+        if self.instance.is_none() {
+            return;
+        }
+        let instance = self.instance.as_ref().unwrap();
+        let physical_device =
+            VkPhysicalDevice::pick_physical_device(&instance, instance.surface.as_ref());
+
+        let create_info = vk::DeviceCreateInfo::default();
+        let physical_device = instance.create_device(physical_device, &create_info);
+
+        let graphics_queue = instance.get_device_queue(&physical_device);
     }
 }
-impl self::VulkanInstance {
+impl self::VKInstance {
+    pub fn get_device_queue(&mut self) {
+        if self.logical_device.is_none() {
+            return;
+        }
+        let vk_logical_device = self.logical_device.unwrap();
+        if self.physical_device.is_none() {
+            return;
+        }
+        let vk_physical_device = self.physical_device.unwrap();
+        let queue = unsafe {
+            vk_logical_device.device.get_device_queue(
+                vk_physical_device.queue_family_indicies.graphics_family,
+                queue_index,
+            )
+        };
+    }
+    pub fn create_device(
+        &mut self,
+        physical_device: VkPhysicalDevice,
+        create_info: &vk::DeviceCreateInfo,
+    ) -> VkLogicalDevice {
+        let logical_device = unsafe {
+            self.instance
+                .create_device(physical_device.physical_device, create_info, None)
+        }
+        .unwrap();
+        self.physical_device.replace(physical_device);
+
+        let logical_device = VkLogicalDevice::new(logical_device);
+        self.logical_device.replace(logical_device);
+        logical_device
+    }
+    pub fn get_physical_device_queue_family_properties(
+        &self,
+        device: vk::PhysicalDevice,
+    ) -> Vec<vk::QueueFamilyProperties> {
+        unsafe {
+            self.instance
+                .get_physical_device_queue_family_properties(device)
+        }
+    }
+    pub fn enumerate_physical_devices(&self) -> Result<Vec<vk::PhysicalDevice>, vk::Result> {
+        unsafe { self.instance.enumerate_physical_devices() }
+    }
+    pub fn get_physical_device_properties(
+        &self,
+        physical_device: vk::PhysicalDevice,
+    ) -> vk::PhysicalDeviceProperties {
+        unsafe {
+            self.instance
+                .get_physical_device_properties(physical_device)
+        }
+    }
     pub fn create(
         app_name: &str,
         engine_name: &str,
@@ -87,6 +286,8 @@ impl self::VulkanInstance {
             entry,
             instance,
             surface: None,
+            logical_device: None,
+            physical_device: None,
         })
     }
     pub fn create_surface(
@@ -94,7 +295,7 @@ impl self::VulkanInstance {
         raw_window_handle: RawWindowHandle,
         raw_display_handle: RawDisplayHandle,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let surface = VulkanSurface::create_from_handles(
+        let surface = VkSurface::create_from_handles(
             &self.entry,
             &self.instance,
             raw_window_handle,
@@ -118,68 +319,43 @@ impl self::VulkanInstance {
         )
     }
 }
+#[derive(Clone, Copy)]
+pub struct QueueFamilyIndicies {
+    graphics_family: u32,
+    present_family: Option<u32>,
+}
+
+pub struct VKInstance {
+    entry: ash::Entry,
+    logical_device: Option<VkLogicalDevice>,
+    physical_device: Option<VkPhysicalDevice>,
+    surface: Option<VkSurface>,
+    instance: ash::Instance,
+}
+
+/// a wrapper struct for ash::Device that takes ownership of the 'Device' and implements drop for RAII cleanup.
+pub struct VkLogicalDevice {
+    device: ash::Device,
+}
+
+pub struct VkPhysicalDevice {
+    physical_device: vk::PhysicalDevice,
+    queue_family_indicies: QueueFamilyIndicies,
+}
+
+pub struct VkSurface {
+    surface_loader: ash::khr::surface::Instance,
+    surface: ash::vk::SurfaceKHR,
+}
 
 /// A Vulkan rendering pipeline that allows for optional headless rendering
 pub struct VulkanBackend {
-    instance: Option<self::VulkanInstance>,
     entry: Entry,
+    instance: Option<self::VKInstance>,
     // surface_loader:Option<ash::ext::surf>
 }
 
-impl VulkanBackend {
-    pub fn new() -> Self {
-        let entry = unsafe { ash::Entry::load() }.unwrap();
-
-        Self {
-            instance: None,
-            entry,
-        }
-    }
-    pub fn initialize(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        // loads the vulkan library
-        let mut extensions = vec![ash::khr::surface::NAME.as_ptr()];
-        #[cfg(target_os = "windows")]
-        {
-            extensions.push(ash::khr::win32_surface::NAME.as_ptr())
-        }
-        #[cfg(unix)]
-        {
-            extensions.push(ash::khr::xlib_surface::NAME.as_ptr())
-        }
-        let layers = vec![];
-
-        let instance = VulkanInstance::create(
-            "Vulkan App",
-            "Jordan's basic vulkan engine",
-            layers.as_slice(),
-            extensions.as_slice(),
-        )?;
-        self.instance.replace(instance);
-        Ok(())
-    }
-    pub fn instance_create_surface(
-        &mut self,
-        window_handle: RawWindowHandle,
-        display_handle: RawDisplayHandle,
-    ) -> Result<(), Box<dyn std::error::Error>>
-    where
-    {
-        if self.instance.is_none() {
-            return Err("Vulkan Instance has not been intialized yet".into());
-        }
-        let instance = self.instance.as_mut().unwrap();
-        instance.create_surface(window_handle,display_handle)
-    }
-    pub fn instance_destroy_surface(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        if self.instance.is_none() {
-            return Err("Vulkan Instance has not been intialized before the call to VulkanBackend::instance_destroy_surfce(&mut self)".into());
-        }
-        let instance = self.instance.as_mut().unwrap();
-        instance.destroy_surface();
-        Ok(())
-    }
-}
-
-impl Drop for VulkanBackend {
-    fn drop(&mut self) {}
-}
+use ash::prelude::*;
+use ash::{Entry, EntryFnV1_0, InstanceFnV1_0, vk};
+use raw_window_handle::{HasDisplayHandle, HasWindowHandle, RawDisplayHandle, RawWindowHandle};
+use std::ffi::CString;

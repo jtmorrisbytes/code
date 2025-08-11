@@ -1,18 +1,18 @@
-use std::path::PathBuf;
 
-use rocket::{
-    fairing::{Fairing, Info, Kind},
-    request::{self, FromRequest},
-    tokio::io::AsyncReadExt,
-    Build, Request, Rocket, State,
-};
-// use serde::{Deserialize, Serialize};
-use crate::frontend::{FrontendApp, FrontendAppProperties};
-
-#[derive(Clone)]
-pub struct FrontendTemplatePath(pub PathBuf);
-
-pub struct FrontendTemplatePathFairing;
+#[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
+#[rocket::async_trait]
+impl<'r> FromRequest<'r> for FrontendTemplatePath {
+    type Error = String;
+    async fn from_request(request: &'r Request<'_>) -> request::Outcome<Self, Self::Error> {
+        let template_path = request
+            .guard::<&State<FrontendTemplatePath>>()
+            .await
+            .expect("TemplatePath");
+        // let figment = request.rocket().figment();
+        // let template_path = figment.extract_inner::<PathBuf>("template_dir").unwrap().join("frontend.html");
+        request::Outcome::Success(template_path.inner().to_owned())
+    }
+}
 #[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
 #[rocket::async_trait]
 impl Fairing for super::FrontendTemplatePathFairing {
@@ -33,21 +33,6 @@ impl Fairing for super::FrontendTemplatePathFairing {
         }
         .join("frontend.html");
         rocket::fairing::Result::Ok(rocket.manage(FrontendTemplatePath(template_path)))
-    }
-}
-
-#[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
-#[rocket::async_trait]
-impl<'r> FromRequest<'r> for FrontendTemplatePath {
-    type Error = String;
-    async fn from_request(request: &'r Request<'_>) -> request::Outcome<Self, Self::Error> {
-        let template_path = request
-            .guard::<&State<FrontendTemplatePath>>()
-            .await
-            .expect("TemplatePath");
-        // let figment = request.rocket().figment();
-        // let template_path = figment.extract_inner::<PathBuf>("template_dir").unwrap().join("frontend.html");
-        request::Outcome::Success(template_path.inner().to_owned())
     }
 }
 #[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
@@ -79,3 +64,18 @@ pub async fn server_render(
     };
     Ok(html)
 }
+
+#[derive(Clone)]
+pub struct FrontendTemplatePath(pub PathBuf);
+
+pub struct FrontendTemplatePathFairing;
+// use serde::{Deserialize, Serialize};
+use crate::frontend::{FrontendApp, FrontendAppProperties};
+
+use rocket::{
+    fairing::{Fairing, Info, Kind},
+    request::{self, FromRequest},
+    tokio::io::AsyncReadExt,
+    Build, Request, Rocket, State,
+};
+use std::path::PathBuf;

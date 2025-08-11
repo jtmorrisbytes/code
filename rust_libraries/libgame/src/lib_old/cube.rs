@@ -1,16 +1,3 @@
-use glam::Vec3;
-
-use crate::{actor::Actor, model::Model};
-
-pub struct Cube {
-    position: Vec3,
-    x_rotation: f32,
-    y_rotation: f32,
-    z_rotation: f32,
-
-    name:String,
-    model:Model
-}
 
 
 impl Actor for Cube {
@@ -62,5 +49,18 @@ impl Actor for Cube {
     }
 }
 
+pub struct Cube {
+    position: Vec3,
+    x_rotation: f32,
+    y_rotation: f32,
+    z_rotation: f32,
+
+    name:String,
+    model:Model
+}
+
+use crate::{actor::Actor, model::Model};
 
 
+
+use glam::Vec3;
