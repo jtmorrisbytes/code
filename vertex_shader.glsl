@@ -26,7 +26,7 @@ mat4 local_space_rotationY_matrix4(float angle) {
         cos,0.0,0.0,0.0,
         0.0,1.0,-sin,0.0,
         -sin,0.0,cos,0.0,
-        0.0,0.0,0.0,0.0
+        0.0,0.0,0.0,1.0
     );
 }
 mat4 local_space_rotationZ_matrix4(float angle) {

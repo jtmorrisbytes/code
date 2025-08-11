@@ -255,6 +255,20 @@ pub fn read_txt_record_from_buffer<Buffer: AsRef<[u8]>>(buffer: Buffer) -> anyho
 // name for question. DOES NOT respect pointers
 pub struct QName(Vec<u8>);
 impl QName {
+    pub fn to_string(&self) -> anyhow::Result<String> {
+        let mut output = String::new();
+        let mut cursor = std::io::Cursor::new(self.0.as_slice());
+        loop {
+            let size = cursor.read_u8()?;
+            if size == 0 {
+                break;
+            }
+            let buffer = read_bytes(size as usize, &mut cursor)?;
+            let s = String::from_utf8(buffer)?;
+            output = output + &s
+        }
+        Ok(output)
+    }
     pub fn read_from_slice<Container: AsRef<[u8]>>(container: Container) -> anyhow::Result<Self> {
         let buffer = container.as_ref();
         let mut cursor = std::io::Cursor::new(buffer);
