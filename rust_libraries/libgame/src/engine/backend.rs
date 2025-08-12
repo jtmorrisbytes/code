@@ -30,7 +30,7 @@ pub trait GraphicsBackend {
     // // creates an instance of this structure. after this call, the backend strucutre must be ready to accept a call to initialize
     // fn new() -> Result<Self,anyhow::Error> where Self:Sized;
     /// creates an instance of this backend. after the call to this function, the backend should be ready to accept drawing commands
-    fn init(render_target:RenderTarget) -> anyhow::Result<Self>;
+    fn init(render_target:RenderTarget) -> anyhow::Result<Self> where Self:Sized;
     fn resize(&mut self, width: u32, height: u32);
     fn render_frame(&mut self, scene: ());
     fn shutdown(&mut self);

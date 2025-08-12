@@ -59,8 +59,7 @@ pub fn main() {
         }
     }
     // we first create the engine and start the backend in headless mode
-    let mut engine = Engine::new(backend_kind);
-    engine.init_backend(&backend_options).unwrap();
+    let mut engine = Engine::new(backend_kind,libgame::engine::backend::RenderTarget::Headless).unwrap();
     let mut game = ExampleGame {
         engine,
         window: None,

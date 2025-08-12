@@ -1,3 +1,17 @@
+impl Backend {
+    fn resume(&mut self,options:&BackendOptions) {
+        match self {
+            Self::Vulkan(v) => v.resume(options),
+            _=>{}
+        }
+    }
+    fn suspend(&mut self) {
+        match self {
+            Self::Vulkan(v) => v.suspend(),
+            _=>{}
+        }
+    }
+}
 
 impl Engine {
     pub fn new(backend_kind: BackendKind,render_target:RenderTarget) -> Result<Self,anyhow::Error> {
@@ -33,20 +47,6 @@ pub enum Backend {
     Vulkan(super::backends::vulkan::VulkanBackend),
     OpenGL(()),
     Headless(()),
-}
-impl Backend {
-    fn resume(&mut self,options:&BackendOptions) {
-        match self {
-            Self::Vulkan(v) => v.resume(options),
-            _=>{}
-        }
-    }
-    fn suspend(&mut self) {
-        match self {
-            Self::Vulkan(v) => v.suspend(),
-            _=>{}
-        }
-    }
 }
 
 pub mod backend;

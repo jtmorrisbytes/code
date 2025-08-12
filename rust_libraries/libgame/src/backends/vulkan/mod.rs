@@ -1,3 +1,4 @@
+#![deny(unused_variables)]
 impl Drop for VkLogicalDevice {
     fn drop(&mut self) {
         unsafe {
@@ -20,6 +21,68 @@ impl Drop for self::VKInstance {
         unsafe { self.instance.destroy_instance(None) }
     }
 }
+
+impl GraphicsBackend for VulkanBackend {
+    fn init(render_target: RenderTarget) -> Result<Self, anyhow::Error> {
+        // loads the vulkan library
+        let entry = unsafe { Entry::load() }?;
+
+        let mut extensions = vec![ash::khr::surface::NAME.as_ptr()];
+        #[cfg(target_os = "windows")]
+        {
+            extensions.push(ash::khr::win32_surface::NAME.as_ptr())
+        }
+        #[cfg(unix)]
+        {
+            extensions.push(ash::khr::xlib_surface::NAME.as_ptr())
+        }
+        let layers = vec![];
+
+        let instance = VKInstance::create(
+            &entry,
+            "Vulkan App",
+            "Jordan's basic vulkan engine",
+            layers.as_slice(),
+            extensions.as_slice(),
+        )?;
+        let surface = match render_target {
+            RenderTarget::Windowed(raw_window_handle, raw_display_handle) => Some(
+                VkSurface::create_from_handles(&entry, &instance, raw_window_handle, raw_display_handle)?,
+            ),
+            _ => None,
+        };
+        let physical_device = VkPhysicalDevice::pick_physical_device(&instance,surface.as_ref());
+
+        let mut graphics_queue_create_info = vk::DeviceQueueCreateInfo::default().queue_family_index(physical_device.queue_family_indicies.graphics_family);
+        graphics_queue_create_info.queue_count = 1;
+        graphics_queue_create_info.queue_priorities(&[1.0]);
+
+        let graphics_queue = ();
+
+        let queue_infose = [graphics_queue_create_info];
+        // create the logical device
+        let mut device_create_info =
+            vk::DeviceCreateInfo::default().queue_create_infos(&queue_infose);
+        
+        let logical_device = unsafe {instance.instance.create_device(physical_device.physical_device, &device_create_info, None)}?;
+        let logical_device = VkLogicalDevice::new(logical_device);
+        // instance.create_virtual_device();
+        Ok(Self {
+            instance,
+            logical_device,
+            physical_device,
+            surface: None,
+            graphics_queue,
+            // presentation_queue,
+            entry,
+        })
+    }
+    fn render_frame(&mut self, _scene: ()) {}
+    fn resize(&mut self, _width: u32, _height: u32) {}
+    fn resume(&mut self, _options: &crate::engine::backend::BackendOptions) {}
+    fn shutdown(&mut self) {}
+    fn suspend(&mut self) {}
+}
 impl QueueFamilyIndicies {
     fn is_complete(&self, need_present: bool) -> bool {
         self.graphics_family != u32::MAX && (!need_present || self.present_family.is_some())
@@ -29,11 +92,11 @@ impl QueueFamilyIndicies {
         device: vk::PhysicalDevice,
         surface: Option<&VkSurface>,
     ) -> Self {
-        let families = vk_instance.get_physical_device_queue_family_properties(device);
+        let families = unsafe {vk_instance.instance.get_physical_device_queue_family_properties(device)};
 
         let mut graphics_family = None;
         let mut present_family = None;
-
+        // is device suitable
         for (index, family) in families.iter().enumerate() {
             if family.queue_flags.contains(vk::QueueFlags::GRAPHICS) {
                 graphics_family = Some(index as u32);
@@ -79,7 +142,7 @@ impl VkPhysicalDevice {
                 let indices =
                     QueueFamilyIndicies::find_queue_families(vk_instance, physical_device, surface);
                 if indices.is_complete(surface.is_some()) {
-                    Some((physical_device, indices))
+                    Some((physical_device, properties, indices))
                 } else {
                     None
                 }
@@ -89,9 +152,10 @@ impl VkPhysicalDevice {
         if physical_devices.len() == 0 {
             panic!("Expected support for physical device but no physical devices are available")
         }
-        let (physical_device, qf) = physical_devices[0];
+        let (physical_device, physical_device_properties,propertiesqf) = physical_devices[0];
         Self {
             physical_device,
+            physical_device_properties,
             queue_family_indicies: qf,
         }
     }
@@ -115,16 +179,16 @@ impl VkSurface {
 
     pub fn create_from_handles(
         entry: &Entry,
-        instance: &ash::Instance,
+        instance: &VKInstance,
         window_handle: RawWindowHandle,
         display_handle: RawDisplayHandle,
-    ) -> Result<VkSurface, Box<dyn std::error::Error>> {
-        let surface_loader = ash::khr::surface::Instance::new(entry, instance);
+    ) -> Result<VkSurface, anyhow::Error> {
+        let surface_loader = ash::khr::surface::Instance::new(entry, &instance.instance);
 
         // handle all possible combinations of window handle and display handle combination
         match (window_handle, display_handle) {
             (RawWindowHandle::Win32(win32_window_handle), RawDisplayHandle::Windows(_)) => {
-                let win32_instance_loader = ash::khr::win32_surface::Instance::new(entry, instance);
+                let win32_instance_loader = ash::khr::win32_surface::Instance::new(entry, &instance.instance);
                 let surface_create_info = vk::Win32SurfaceCreateInfoKHR::default()
                     .hinstance(win32_window_handle.hinstance.unwrap().get())
                     .hwnd(win32_window_handle.hwnd.get());
@@ -142,34 +206,19 @@ impl VkSurface {
     pub fn create_headless() {}
 }
 
-impl VulkanBackend {
-    pub fn create_graphics_queue(instance: &VKInstance, physical_device: &VkPhysicalDevice) {}
-    pub fn instance_create_surface(
-        &mut self,
-        window_handle: RawWindowHandle,
-        display_handle: RawDisplayHandle,
-    ) -> Result<VkSurface, Box<dyn std::error::Error>>
-where {
-        self.instance.create_surface(window_handle, display_handle)
-    }
-    pub fn instance_destroy_surface(
-        vk_instance: &mut VKInstance,
-    ) -> Result<(), Box<dyn std::error::Error>> {
-        vk_instance.destroy_surface();
-        Ok(())
-    }
-}
+
 impl self::VKInstance {
     pub fn get_device_queue(
         vk_logical_device: &VkLogicalDevice,
         vk_physical_device: &VkPhysicalDevice,
-    ) {
+    ) -> ash::vk::Queue{
         let queue = unsafe {
             vk_logical_device.device.get_device_queue(
                 vk_physical_device.queue_family_indicies.graphics_family,
                 0,
             )
         };
+        queue
     }
     pub fn create_logical_device(
         instance: &VKInstance,
@@ -198,13 +247,12 @@ impl self::VKInstance {
         unsafe { instance.instance.get_physical_device_properties(physical_device) }
     }
     pub fn create(
-        render_target: RenderTarget,
+        entry:&Entry,
         app_name: &str,
         engine_name: &str,
         layers: &[*const i8],
         extensions: &[*const i8],
     ) -> ash::prelude::VkResult<Self> {
-        let entry = unsafe { Entry::load().unwrap() };
 
         let app_name_c = CString::new(app_name).unwrap();
         let engine_name_c = CString::new(engine_name).unwrap();
@@ -223,7 +271,7 @@ impl self::VKInstance {
 
         let instance = unsafe { entry.create_instance(&create_info, None)? };
 
-        Ok(Self { entry, instance })
+        Ok(Self { entry:entry.to_owned(), instance })
     }
     pub fn create_surface(
         &self,
@@ -232,7 +280,7 @@ impl self::VKInstance {
     ) -> Result<VkSurface, Box<dyn std::error::Error>> {
         let surface = VkSurface::create_from_handles(
             &self.entry,
-            &self.instance,
+            &self,
             raw_window_handle,
             raw_display_handle,
         )?;
@@ -259,6 +307,7 @@ pub struct VkLogicalDevice {
 
 pub struct VkPhysicalDevice {
     physical_device: vk::PhysicalDevice,
+    properties: vk::PhysicalDeviceProperties,
     queue_family_indicies: QueueFamilyIndicies,
 }
 
@@ -278,68 +327,9 @@ pub struct VulkanBackend {
     // surface_loader:Option<ash::ext::surf>
 }
 
-impl GraphicsBackend for VulkanBackend {
-    fn init(render_target: RenderTarget) -> Result<Self, anyhow::Error> {
-        // loads the vulkan library
-        let entry = unsafe { Entry::load() }?;
-
-        let mut extensions = vec![ash::khr::surface::NAME.as_ptr()];
-        #[cfg(target_os = "windows")]
-        {
-            extensions.push(ash::khr::win32_surface::NAME.as_ptr())
-        }
-        #[cfg(unix)]
-        {
-            extensions.push(ash::khr::xlib_surface::NAME.as_ptr())
-        }
-        let layers = vec![];
-
-        let instance = VKInstance::create(
-            entry,
-            "Vulkan App",
-            "Jordan's basic vulkan engine",
-            layers.as_slice(),
-            extensions.as_slice(),
-        )?;
-        let surface = match render_target {
-            RenderTarget::Windowed(raw_window_handle, raw_display_handle) => Some(
-                VkSurface::create_from_handles(entry, instance, window_handle, display_handle)?,
-            ),
-            _ => None,
-        };
-        let physical_device = Self::pick_physical_device(vk_instance);
-
-        let mut graphics_queue_create_info = vk::DeviceQueueCreateInfo::default().queue_family_index(physical_device.queue_family_indicies.graphics_family);
-        graphics_queue_create_info.queue_count = 1;
-        graphics_queue_create_info.queue_priorities(&[1.0]);
-
-        let graphics_queue = ();
-
-        // create the logical device
-        let mut device_create_info =
-            vk::DeviceCreateInfo::default().queue_create_infos([&graphics_queue_create_info]);
-        
-        instance.create_virtual_device()
-        Ok(Self {
-            instance,
-            logical_device,
-            physical_device,
-            surface: None,
-            graphics_queue,
-            // presentation_queue,
-            entry,
-        })
-    }
-    fn render_frame(&mut self, scene: ()) {}
-    fn resize(&mut self, width: u32, height: u32) {}
-    fn resume(&mut self, options: &crate::engine::backend::BackendOptions) {}
-    fn shutdown(&mut self) {}
-    fn suspend(&mut self) {}
-}
-
 use ash::prelude::*;
 use ash::{Entry, EntryFnV1_0, InstanceFnV1_0, vk};
-use raw_window_handle::{HasDisplayHandle, HasWindowHandle, RawDisplayHandle, RawWindowHandle};
-use std::ffi::CString;
 
 use crate::engine::backend::{GraphicsBackend, RenderTarget};
+use raw_window_handle::{HasDisplayHandle, HasWindowHandle, RawDisplayHandle, RawWindowHandle};
+use std::ffi::CString;
