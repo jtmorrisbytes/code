@@ -14,11 +14,11 @@ impl Backend {
 }
 
 impl Engine {
-    pub fn new(backend_kind: BackendKind,render_target:RenderTarget) -> Result<Self,anyhow::Error> {
+    pub fn new(backend_kind: BackendKind,backend_options: &BackendOptions) -> Result<Self,anyhow::Error> {
         // create a vulkan backend, then an opengl backend
         let backend = match backend_kind {
             BackendKind::Vulkan => {
-                let v = VulkanBackend::init(render_target)?;
+                let v = VulkanBackend::init(backend_options)?;
                 Backend::Vulkan(v)
             }
             BackendKind::OpenGL => Backend::OpenGL(()),
@@ -34,6 +34,15 @@ impl Engine {
     }
     pub fn on_resumed(&mut self, options: &BackendOptions) {
         self.graphics_backend.resume(options);
+    }
+    pub fn re_init_backend(&mut self, options: &BackendOptions) -> anyhow::Result<()> {
+        self.graphics_backend = match self.graphics_backend {
+            Backend::Vulkan(_) => Backend::Vulkan(VulkanBackend::init(&options)?),
+            Backend::Headless(_) => Backend::Headless(()),
+            Backend::OpenGL(_) => Backend::OpenGL(())
+        };
+        Ok(())
+        
     }
 }
 

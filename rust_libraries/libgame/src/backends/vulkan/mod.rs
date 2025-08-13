@@ -1,335 +1,247 @@
-#![deny(unused_variables)]
-impl Drop for VkLogicalDevice {
-    fn drop(&mut self) {
-        unsafe {
-            self.device.destroy_device(None);
+use crate::{
+    backends::vulkan::helper_structs::{VkDevice, VkExtDebugUtils, _____default_debug_callback_fn},
+    engine::backend::{GraphicsBackend, RenderTarget},
+};
+use anyhow::Context;
+use ash::vk::{self, QueueFlags};
+pub mod helper_structs;
+// Drop::drop is called in order of the fields.
+// ash::Entry must be last, then the instance second last,
+// then any other objects that depend on instance must be declared
+// in reverse order that they are
+pub struct VulkanBackend {
+    device_graphics_queue: ash::vk::Queue,
+    device: VkDevice,
+    debug_utils: Option<helper_structs::VkExtDebugUtils>,
+    instance: helper_structs::VkInstance,
+    entry: ash::Entry,
+}
+
+pub struct InstanceCreateOptions<EngineName, ApplicationName>
+where
+    EngineName: AsRef<str>,
+    ApplicationName: AsRef<str>,
+{
+    pub engine_name: EngineName,
+    pub application_name: ApplicationName,
+    pub headless: bool,
+    pub enable_validation_layers: bool,
+    pub enable_debug_logging: bool,
+}
+
+fn create_instance<S: AsRef<str>>(
+    entry: &ash::Entry,
+    options: InstanceCreateOptions<S, S>,
+) -> anyhow::Result<ash::Instance> {
+    let app_name = std::ffi::CString::new(options.application_name.as_ref())?;
+    let engine_name = std::ffi::CString::new(options.engine_name.as_ref())?;
+
+    let appinfo = ash::vk::ApplicationInfo::default()
+        .application_name(&app_name)
+        .engine_name(&engine_name)
+        .api_version(vk::API_VERSION_1_2)
+        .engine_version(0)
+        .application_version(0);
+    let mut enabled_instance_extensions = vec![];
+    let mut enabled_validation_layers = vec![];
+    let available_extensions =
+        unsafe { entry.enumerate_instance_extension_properties(None) }.unwrap_or_default();
+
+    if options.headless == false {
+        let mut requested_extensions: Vec<_> = available_extensions
+            .iter()
+            .filter_map(|extension_properties| {
+                // enable VK_KHR_SURFACE extenstion if the name matches and the spec version is greater or equal to the spec version (I assume the verion ash supports)
+                let extension_name_cstr = extension_properties.extension_name_as_c_str().unwrap();
+                if extension_name_cstr == ash::khr::surface::NAME
+                    && extension_properties.spec_version >= ash::khr::surface::SPEC_VERSION
+                {
+                    println!("enabling VK_KHR_surface");
+                    return Some(ash::khr::surface::NAME.as_ptr());
+                }
+                // VK_KHR_SWAPCHAIN
+                if extension_name_cstr == ash::khr::swapchain::NAME
+                    && extension_properties.spec_version >= ash::khr::swapchain::SPEC_VERSION
+                {
+                    println!("enabling VK_KHR_swapchain");
+
+                    return Some(ash::khr::swapchain::NAME.as_ptr());
+                }
+                #[cfg(target_os = "windows")]
+                {
+                    if extension_name_cstr == ash::khr::win32_surface::NAME
+                        && extension_properties.spec_version
+                            >= ash::khr::win32_surface::SPEC_VERSION
+                    {
+                        println!("enabling VK_KHR_win32_surface");
+                        return Some(ash::khr::win32_surface::NAME.as_ptr());
+                    }
+                }
+                #[cfg(target_os = "linux")]
+                {
+                    if extension_name_cstr == ash::khr::xcb_surface::NAME
+                        && extension_properties.spec_version >= ash::khr::xcb_surface::SPEC_VERSION
+                    {
+                        println!("enabling VK_KHR_xcb_surface");
+                        return Some(ash::khr::xcb_surface::NAME);
+                    }
+                    if extension_name_cstr == ash::khr::xlib_surface::NAME
+                        && extension_properties.spec_version >= ash::khr::xlib_surface::SPEC_VERSION
+                    {
+                        println!("enabling VK_KHR_xlib_surface")
+                    }
+                }
+                return None;
+            })
+            .collect();
+        enabled_instance_extensions.append(&mut requested_extensions);
+    }
+    if options.enable_validation_layers {
+        if let Some(VK_EXT_debug_utils_name) = available_extensions
+            .iter()
+            .find(|extension_properties| {
+                extension_properties.extension_name_as_c_str().unwrap()
+                    == ash::ext::debug_utils::NAME
+                    && extension_properties.spec_version >= ash::ext::debug_utils::SPEC_VERSION
+            })
+            .map(|_| ash::ext::debug_utils::NAME.as_ptr())
+        {
+            enabled_instance_extensions.push(VK_EXT_debug_utils_name);
+            // enable the debug laer
+        }
+        if unsafe { entry.enumerate_instance_layer_properties() }?
+            .iter()
+            .find(|l_p| l_p.layer_name_as_c_str().unwrap() == c"VK_LAYER_KHRONOS_validation")
+            .is_some()
+        {
+            enabled_validation_layers.push(c"VK_LAYER_KHRONOS_validation".as_ptr())
         }
     }
-}
-impl Drop for VkPhysicalDevice {
-    fn drop(&mut self) {}
-}
-impl Drop for VkSurface {
-    fn drop(&mut self) {
-        unsafe {
-            self.surface_loader.destroy_surface(self.surface, None);
-        }
-    }
-}
-impl Drop for self::VKInstance {
-    fn drop(&mut self) {
-        unsafe { self.instance.destroy_instance(None) }
-    }
+    let mut create_info = ash::vk::InstanceCreateInfo::default()
+        .application_info(&appinfo)
+        .enabled_extension_names(&enabled_instance_extensions)
+        .enabled_layer_names(&enabled_validation_layers);
+
+    let instance = unsafe { entry.create_instance(&create_info, None) }?;
+    Ok(instance)
 }
 
 impl GraphicsBackend for VulkanBackend {
-    fn init(render_target: RenderTarget) -> Result<Self, anyhow::Error> {
-        // loads the vulkan library
-        let entry = unsafe { Entry::load() }?;
+    fn init(backend_options: &crate::engine::backend::BackendOptions) -> anyhow::Result<Self>
+    where
+        Self: Sized,
+    {
+        let entry = unsafe { ash::Entry::load() }?;
 
-        let mut extensions = vec![ash::khr::surface::NAME.as_ptr()];
-        #[cfg(target_os = "windows")]
-        {
-            extensions.push(ash::khr::win32_surface::NAME.as_ptr())
-        }
-        #[cfg(unix)]
-        {
-            extensions.push(ash::khr::xlib_surface::NAME.as_ptr())
-        }
-        let layers = vec![];
-
-        let instance = VKInstance::create(
-            &entry,
-            "Vulkan App",
-            "Jordan's basic vulkan engine",
-            layers.as_slice(),
-            extensions.as_slice(),
-        )?;
-        let surface = match render_target {
-            RenderTarget::Windowed(raw_window_handle, raw_display_handle) => Some(
-                VkSurface::create_from_handles(&entry, &instance, raw_window_handle, raw_display_handle)?,
-            ),
-            _ => None,
+        let instance_create_options = InstanceCreateOptions {
+            engine_name: "Jordan's Basic vulkan engine",
+            application_name: "To be inserted later",
+            headless: backend_options.render_target == RenderTarget::Headless,
+            enable_validation_layers: backend_options.enable_debug_logging,
+            enable_debug_logging: backend_options.enable_debug_logging,
         };
-        let physical_device = VkPhysicalDevice::pick_physical_device(&instance,surface.as_ref());
+        let instance = create_instance(&entry, instance_create_options)?;
+        // wrap the raw instance in a helper struct because we want to clean up automatically at the end of this function
+        let instance = helper_structs::VkInstance::new(instance);
+        // enable the debug utils here if neccessary
+        // create an instance of the debug utils function loader
 
-        let mut graphics_queue_create_info = vk::DeviceQueueCreateInfo::default().queue_family_index(physical_device.queue_family_indicies.graphics_family);
-        graphics_queue_create_info.queue_count = 1;
-        graphics_queue_create_info.queue_priorities(&[1.0]);
+        let debug_utils = {
+            if backend_options.enable_debug_logging {
+                Some(VkExtDebugUtils::try_new(
+                    &entry,
+                    &instance,
+                    Some(_____default_debug_callback_fn),
+                )?)
+            } else {
+                None
+            }
+        };
+        // -- pick physical devices --
 
-        let graphics_queue = ();
+        // enumerate the devices on the system
+        let physical_devices = unsafe { instance.enumerate_physical_devices() }
+            .context("Vulkan failed to enumerate physical devices (GPUS)")?;
+        if physical_devices.len() == 0 {
+            return Err(anyhow::Error::msg(
+                "Vulkan failed to find any supported physical devices on the system.",
+            ));
+        }
 
-        let queue_infose = [graphics_queue_create_info];
-        // create the logical device
-        let mut device_create_info =
-            vk::DeviceCreateInfo::default().queue_create_infos(&queue_infose);
+        let mut chosen_physical_device = None;
+        for physical_device in physical_devices {
+            let properties = unsafe { instance.get_physical_device_properties(physical_device) };
+
+            let features = unsafe { instance.get_physical_device_features(physical_device) };
+
+            println!("{properties:?}\n");
+            println!("{features:?}");
+            chosen_physical_device = Some(physical_device);
+        }
+        if chosen_physical_device.is_none() {
+            return Err(anyhow::Error::msg(
+                "Vulkan: There is no physical device suitable for this application",
+            ));
+        }
+        let physical_device = chosen_physical_device.unwrap();
+
+        // find queue families
+
+        let queue_family_index = match find_graphics_queue_indicies(&instance, physical_device) {
+            Ok(value) => value,
+            Err(value) => return value,
+        };
+
+
         
-        let logical_device = unsafe {instance.instance.create_device(physical_device.physical_device, &device_create_info, None)}?;
-        let logical_device = VkLogicalDevice::new(logical_device);
-        // instance.create_virtual_device();
+        // now we need to create queues
+        let mut queue_create_info = ash::vk::DeviceQueueCreateInfo::default()
+            .queue_family_index(queue_family_index as u32)
+            .queue_priorities(&[1.0_f32]);
+        let required_device_features = ash::vk::PhysicalDeviceFeatures::default();
+
+        let infos = [queue_create_info];
+        let device_create_info = ash::vk::DeviceCreateInfo::default()
+            .enabled_features(&required_device_features)
+            .queue_create_infos(&infos);
+
+        let logical_device = unsafe {instance.create_device(physical_device, &device_create_info, None)}?;
+        // use the hepler struct that calls drop automatially
+        let logical_device = VkDevice::new(logical_device);
+
+        // get a reference to the queue we just created
+        let device_graphics_queue = unsafe {logical_device.get_device_queue(queue_family_index as u32, 0)};
         Ok(Self {
-            instance,
-            logical_device,
-            physical_device,
-            surface: None,
-            graphics_queue,
-            // presentation_queue,
+            device_graphics_queue,
+            device:logical_device,
+            debug_utils,
             entry,
+            instance,
         })
     }
-    fn render_frame(&mut self, _scene: ()) {}
-    fn resize(&mut self, _width: u32, _height: u32) {}
-    fn resume(&mut self, _options: &crate::engine::backend::BackendOptions) {}
+    fn render_frame(&mut self, scene: ()) {}
+    fn resize(&mut self, width: u32, height: u32) {}
+    fn resume(&mut self, options: &crate::engine::backend::BackendOptions) {}
     fn shutdown(&mut self) {}
     fn suspend(&mut self) {}
 }
-impl QueueFamilyIndicies {
-    fn is_complete(&self, need_present: bool) -> bool {
-        self.graphics_family != u32::MAX && (!need_present || self.present_family.is_some())
-    }
-    fn find_queue_families(
-        vk_instance: &VKInstance,
-        device: vk::PhysicalDevice,
-        surface: Option<&VkSurface>,
-    ) -> Self {
-        let families = unsafe {vk_instance.instance.get_physical_device_queue_family_properties(device)};
 
-        let mut graphics_family = None;
-        let mut present_family = None;
-        // is device suitable
-        for (index, family) in families.iter().enumerate() {
-            if family.queue_flags.contains(vk::QueueFlags::GRAPHICS) {
-                graphics_family = Some(index as u32);
-            }
-            if let Some(surface) = surface {
-                let supports_present =
-                    surface.get_physical_device_surface_support(device, index as u32);
-                if supports_present {
-                    present_family = Some(index as u32)
-                }
-            }
-        }
-        Self {
-            graphics_family: graphics_family
-                .expect("Expected to find a graphics family queue index but was none"),
-            present_family,
+fn find_graphics_queue_indicies(instance: &ash::Instance, physical_device: vk::PhysicalDevice,headless:bool) -> Result<usize, Result<VulkanBackend, anyhow::Error>> {
+    let queue_family_properties =
+        unsafe { instance.get_physical_device_queue_family_properties(physical_device) };
+    let mut graphics_queue = None;
+    for (index, properties) in queue_family_properties.iter().enumerate() {
+        if properties.queue_flags.contains(QueueFlags::GRAPHICS) {
+            graphics_queue = Some((index, *properties));
+            break;
         }
     }
-}
-
-
-
-impl VkLogicalDevice {
-    fn new(device: ash::Device) -> Self {
-        Self { device }
+    if graphics_queue.is_none() {
+        return Err(Err(anyhow::Error::msg(
+            "Failed to find a sutable GRAPHICS queue",
+        )));
     }
+    let (queue_family_index, queue_family_poperties) =
+        graphics_queue.unwrap();
+    Ok(queue_family_index)
 }
-
-impl VkPhysicalDevice {
-
-    
-    pub fn pick_physical_device(vk_instance: &VKInstance, surface: Option<&VkSurface>) -> Self {
-        let physical_devices = vk_instance.enumerate_physical_devices().expect(
-            "Failed to enumerate physical devices for VkPhysicalDevice::pick_physical_devices",
-        );
-        let physical_devices: Vec<_> = physical_devices
-            .clone()
-            .into_iter()
-            .filter_map(|physical_device| {
-                // compile_error!("finish picking physical devices")
-                let properties = unsafe {vk_instance.instance.get_physical_device_properties(physical_device)};
-
-                let indices =
-                    QueueFamilyIndicies::find_queue_families(vk_instance, physical_device, surface);
-                if indices.is_complete(surface.is_some()) {
-                    Some((physical_device, properties, indices))
-                } else {
-                    None
-                }
-            })
-            .collect();
-
-        if physical_devices.len() == 0 {
-            panic!("Expected support for physical device but no physical devices are available")
-        }
-        let (physical_device, physical_device_properties,propertiesqf) = physical_devices[0];
-        Self {
-            physical_device,
-            physical_device_properties,
-            queue_family_indicies: qf,
-        }
-    }
-}
-impl VkSurface {
-    pub fn get_physical_device_surface_support(
-        &self,
-        physical_device: vk::PhysicalDevice,
-        queue_family_index: u32,
-    ) -> bool {
-        unsafe {
-            self.surface_loader.get_physical_device_surface_support(
-                physical_device,
-                queue_family_index,
-                self.surface,
-            )
-        }
-        .unwrap_or(false)
-    }
-    // handles the platform specific surface creation code
-
-    pub fn create_from_handles(
-        entry: &Entry,
-        instance: &VKInstance,
-        window_handle: RawWindowHandle,
-        display_handle: RawDisplayHandle,
-    ) -> Result<VkSurface, anyhow::Error> {
-        let surface_loader = ash::khr::surface::Instance::new(entry, &instance.instance);
-
-        // handle all possible combinations of window handle and display handle combination
-        match (window_handle, display_handle) {
-            (RawWindowHandle::Win32(win32_window_handle), RawDisplayHandle::Windows(_)) => {
-                let win32_instance_loader = ash::khr::win32_surface::Instance::new(entry, &instance.instance);
-                let surface_create_info = vk::Win32SurfaceCreateInfoKHR::default()
-                    .hinstance(win32_window_handle.hinstance.unwrap().get())
-                    .hwnd(win32_window_handle.hwnd.get());
-                let surface = unsafe {
-                    win32_instance_loader.create_win32_surface(&surface_create_info, None)?
-                };
-                Ok(Self {
-                    surface,
-                    surface_loader,
-                })
-            }
-            unimpl => todo!("{unimpl:?}"),
-        }
-    }
-    pub fn create_headless() {}
-}
-
-
-impl self::VKInstance {
-    pub fn get_device_queue(
-        vk_logical_device: &VkLogicalDevice,
-        vk_physical_device: &VkPhysicalDevice,
-    ) -> ash::vk::Queue{
-        let queue = unsafe {
-            vk_logical_device.device.get_device_queue(
-                vk_physical_device.queue_family_indicies.graphics_family,
-                0,
-            )
-        };
-        queue
-    }
-    pub fn create_logical_device(
-        instance: &VKInstance,
-        physical_device: &VkPhysicalDevice,
-        create_info: &vk::DeviceCreateInfo,
-    ) -> VkLogicalDevice {
-        let logical_device =
-            unsafe { instance.instance.create_device(physical_device.physical_device, create_info, None) }
-                .unwrap();
-        let logical_device = VkLogicalDevice::new(logical_device);
-        logical_device
-    }
-    pub fn get_physical_device_queue_family_properties(
-        instance: &VKInstance,
-        device: vk::PhysicalDevice,
-    ) -> Vec<vk::QueueFamilyProperties> {
-        unsafe { instance.instance.get_physical_device_queue_family_properties(device) }
-    }
-    pub fn enumerate_physical_devices(&self) -> Result<Vec<vk::PhysicalDevice>, vk::Result> {
-        unsafe { self.instance.enumerate_physical_devices() }
-    }
-    pub fn get_physical_device_properties(
-        instance: &VKInstance,
-        physical_device: vk::PhysicalDevice,
-    ) -> vk::PhysicalDeviceProperties {
-        unsafe { instance.instance.get_physical_device_properties(physical_device) }
-    }
-    pub fn create(
-        entry:&Entry,
-        app_name: &str,
-        engine_name: &str,
-        layers: &[*const i8],
-        extensions: &[*const i8],
-    ) -> ash::prelude::VkResult<Self> {
-
-        let app_name_c = CString::new(app_name).unwrap();
-        let engine_name_c = CString::new(engine_name).unwrap();
-
-        let app_info = vk::ApplicationInfo::default()
-            .application_name(&app_name_c)
-            .application_version(vk::make_api_version(0, 1, 0, 0))
-            .engine_name(&engine_name_c)
-            .engine_version(vk::make_api_version(0, 1, 0, 0))
-            .api_version(vk::API_VERSION_1_3);
-
-        let create_info = vk::InstanceCreateInfo::default()
-            .application_info(&app_info)
-            .enabled_extension_names(extensions)
-            .enabled_layer_names(&layers);
-
-        let instance = unsafe { entry.create_instance(&create_info, None)? };
-
-        Ok(Self { entry:entry.to_owned(), instance })
-    }
-    pub fn create_surface(
-        &self,
-        raw_window_handle: RawWindowHandle,
-        raw_display_handle: RawDisplayHandle,
-    ) -> Result<VkSurface, Box<dyn std::error::Error>> {
-        let surface = VkSurface::create_from_handles(
-            &self.entry,
-            &self,
-            raw_window_handle,
-            raw_display_handle,
-        )?;
-        
-        Ok(surface)
-    }
-    
-}
-#[derive(Clone, Copy)]
-pub struct QueueFamilyIndicies {
-    graphics_family: u32,
-    present_family: Option<u32>,
-}
-
-pub struct VKInstance {
-    entry: ash::Entry,
-    instance: ash::Instance,
-}
-
-/// a wrapper struct for ash::Device that takes ownership of the 'Device' and implements drop for RAII cleanup.
-pub struct VkLogicalDevice {
-    device: ash::Device,
-}
-
-pub struct VkPhysicalDevice {
-    physical_device: vk::PhysicalDevice,
-    properties: vk::PhysicalDeviceProperties,
-    queue_family_indicies: QueueFamilyIndicies,
-}
-
-pub struct VkSurface {
-    surface_loader: ash::khr::surface::Instance,
-    surface: ash::vk::SurfaceKHR,
-}
-
-/// A Vulkan rendering pipeline that allows for optional headless rendering
-pub struct VulkanBackend {
-    entry: Entry,
-    logical_device: VkLogicalDevice,
-    physical_device: VkPhysicalDevice,
-    graphics_queue: (),
-    surface: Option<VkSurface>,
-    instance: self::VKInstance,
-    // surface_loader:Option<ash::ext::surf>
-}
-
-use ash::prelude::*;
-use ash::{Entry, EntryFnV1_0, InstanceFnV1_0, vk};
-
-use crate::engine::backend::{GraphicsBackend, RenderTarget};
-use raw_window_handle::{HasDisplayHandle, HasWindowHandle, RawDisplayHandle, RawWindowHandle};
-use std::ffi::CString;

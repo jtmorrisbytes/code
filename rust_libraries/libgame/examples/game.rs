@@ -26,8 +26,10 @@ impl ApplicationHandler for ExampleGame {
                 render_target: libgame::engine::backend::RenderTarget::windowed(
                     self.window.as_ref().unwrap(),
                 ),
+                ..self.backend_options
+
             };
-            self.engine.init_backend(&self.backend_options).unwrap();
+            self.engine.re_init_backend(&self.backend_options).unwrap();
         }
         let window = self.window.as_ref().unwrap();
         self.engine.on_resumed(&self.backend_options);
@@ -41,8 +43,10 @@ impl ApplicationHandler for ExampleGame {
 pub fn main() {
     let args = std::env::args();
     let mut backend_kind = libgame::engine::BackendKind::Vulkan;
-    let backend_options = libgame::engine::backend::BackendOptions {
+    let mut backend_options = libgame::engine::backend::BackendOptions {
         render_target: libgame::engine::backend::RenderTarget::Headless,
+        enable_debug_logging:true
+
     };
     let mut args_iter = args.into_iter();
     let _program_name = args_iter.next();
@@ -55,11 +59,12 @@ pub fn main() {
             ("backend", "vulkan") => backend_kind = BackendKind::Vulkan,
             ("backend", "opengl") => backend_kind = BackendKind::OpenGL,
             ("backend", "headless") => backend_kind = BackendKind::Headless,
+            ("backend_enable_debug_log","true") => backend_options.enable_debug_logging = true,
             _ => {}
         }
     }
     // we first create the engine and start the backend in headless mode
-    let mut engine = Engine::new(backend_kind,libgame::engine::backend::RenderTarget::Headless).unwrap();
+    let mut engine = Engine::new(backend_kind,&backend_options).unwrap();
     let mut game = ExampleGame {
         engine,
         window: None,
